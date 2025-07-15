@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(layout="wide")
+# Define a configuração da página para iniciar com o tema claro (fundo branco)
+st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 def load_and_process_data(file_path):
     df = pd.read_csv(file_path)
@@ -38,11 +39,8 @@ df_processed = load_and_process_data('GeminiCheck.csv')
 st.title("Recruitment Dashboard")
 st.sidebar.header("Filters")
 
-# --- Toggle para Dark Mode e Cores Customizadas ---
-dark_mode = st.sidebar.toggle('Dark Mode', value=True)
-chart_template = 'plotly_dark' if dark_mode else 'plotly_white'
+# Cores personalizadas que você pediu
 custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
-
 
 # --- Lógica de Filtros Dinâmicos ---
 df_filtered = df_processed.copy()
@@ -92,8 +90,10 @@ else:
             by_age, x='age_group', y='Pessoas_Para_Recrutar',
             title='Demand by Age Group',
             labels={'age_group': 'Age Group', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            template=chart_template, color_discrete_sequence=custom_colors
+            color_discrete_sequence=custom_colors
         )
+        # Removemos o template para que ele se adapte ao tema do Streamlit
+        fig_age.update_layout(template="streamlit")
         st.plotly_chart(fig_age, use_container_width=True)
 
     with col2:
@@ -101,8 +101,9 @@ else:
         fig_gender = px.pie(
             by_gender, names='Gender', values='Pessoas_Para_Recrutar',
             title='Demand by Gender', hole=0.3,
-            template=chart_template, color_discrete_sequence=custom_colors
+            color_discrete_sequence=custom_colors
         )
+        fig_gender.update_layout(template="streamlit")
         st.plotly_chart(fig_gender, use_container_width=True)
 
     col3, col4 = st.columns(2)
@@ -113,8 +114,9 @@ else:
             by_country, x='pais', y='Pessoas_Para_Recrutar',
             title='Demand by Country',
             labels={'pais': 'Country', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            template=chart_template, color_discrete_sequence=custom_colors
+            color_discrete_sequence=custom_colors
         )
+        fig_country.update_layout(template="streamlit")
         st.plotly_chart(fig_country, use_container_width=True)
         
     with col4:
@@ -123,8 +125,9 @@ else:
             by_sel, x='SEL', y='Pessoas_Para_Recrutar',
             title='Demand by Socioeconomic Level (SEL)',
             labels={'SEL': 'Socioeconomic Level', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            template=chart_template, color_discrete_sequence=custom_colors
+            color_discrete_sequence=custom_colors
         )
+        fig_sel.update_layout(template="streamlit")
         st.plotly_chart(fig_sel, use_container_width=True)
 
     st.write("Detailed Data:")
