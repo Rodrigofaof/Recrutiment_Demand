@@ -4,13 +4,11 @@ import plotly.express as px
 
 st.set_page_config(layout="wide")
 
-# O @st.cache_data foi removido para garantir que o código de tratamento de dados seja sempre executado.
 def load_and_process_data(file_path):
     df = pd.read_csv(file_path)
     
     def extract_quota_data(row):
         try:
-            # Garante que a tupla tenha 4 elementos, preenchendo com None se faltar
             items = [item.strip() for item in row.strip("()").replace("'", "").split(',')]
             while len(items) < 4:
                 items.append(None)
@@ -35,35 +33,44 @@ def load_and_process_data(file_path):
 df_processed = load_and_process_data('GeminiCheck.csv')
 
 st.title("Recruitment Dashboard")
-
 st.sidebar.header("Filters")
 
-# --- Lógica de Filtros ---
-# Filtra o dataframe principal uma única vez ao final
+# --- Lógica de Filtros Dinâmicos ---
+df_filtered = df_processed.copy()
 
-# Filtro de País
-countries = sorted(df_processed['pais'].unique())
+# Filtro de País (sempre visível)
+countries = sorted(df_filtered['pais'].unique())
 selected_countries = st.sidebar.multiselect('Select Country(s)', countries, default=countries)
+if selected_countries:
+    df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
 
-# Filtro de Faixa Etária
-age_groups = sorted(df_processed['age_group'].unique())
-selected_age_groups = st.sidebar.multiselect('Select Age Group(s)', age_groups, default=age_groups)
+# Filtro de Faixa Etária (condicional)
+age_groups = sorted(df_filtered['age_group'].unique())
+if len(age_groups) > 1:
+    selected_age_groups = st.sidebar.multiselect('Select Age Group(s)', age_groups, default=age_groups)
+    if selected_age_groups:
+        df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
+else:
+    selected_age_groups = age_groups
 
-# Filtro de Gênero
-genders = sorted(df_processed['Gender'].unique())
-selected_genders = st.sidebar.multiselect('Select Gender(s)', genders, default=genders)
+# Filtro de Gênero (condicional)
+genders = sorted(df_filtered['Gender'].unique())
+if len(genders) > 1:
+    selected_genders = st.sidebar.multiselect('Select Gender(s)', genders, default=genders)
+    if selected_genders:
+        df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
+else:
+    selected_genders = genders
 
-# Filtro de SEL
-sels = sorted(df_processed['SEL'].unique())
-selected_sels = st.sidebar.multiselect('Select SEL(s)', sels, default=sels)
+# Filtro de SEL (condicional)
+sels = sorted(df_filtered['SEL'].unique())
+if len(sels) > 1:
+    selected_sels = st.sidebar.multiselect('Select SEL(s)', sels, default=sels)
+    if selected_sels:
+        df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
+else:
+    selected_sels = sels
 
-# Aplica todos os filtros de uma vez para criar o dataframe final
-df_filtered = df_processed[
-    df_processed['pais'].isin(selected_countries) &
-    df_processed['age_group'].isin(selected_age_groups) &
-    df_processed['Gender'].isin(selected_genders) &
-    df_processed['SEL'].isin(selected_sels)
-]
 
 st.header("Recruitment Overview")
 
@@ -87,6 +94,7 @@ else:
         fig_gender = px.pie(
             by_gender, names='Gender', values='Pessoas_Para_Recrutar',
             title='Demand by Gender', hole=0.3,
+            labels={'Gender': 'Gender', 'Pessoas_Para_Recrutar': 'People to Recruit'},
             template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Pastel
         )
         st.plotly_chart(fig_gender, use_container_width=True)
@@ -116,7 +124,6 @@ else:
     st.write("Detailed Data:")
     st.dataframe(df_filtered)
 
-    # Função de download precisa estar dentro do else para não dar erro se df_filtered estiver vazio
     @st.cache_data
     def convert_df_to_csv(df):
         return df.to_csv(index=False).encode('utf-8')
