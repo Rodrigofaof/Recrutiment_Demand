@@ -22,7 +22,6 @@ def load_and_process_data(file_path):
 
     df.rename(columns={'country': 'pais'}, inplace=True)
     
-    # Adicionada a coluna 'allocated_completes'
     df_clean = df[['pais', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes']].copy()
     
     df_clean['Pessoas_Para_Recrutar'] = pd.to_numeric(df_clean['Pessoas_Para_Recrutar'], errors='coerce')
@@ -38,6 +37,12 @@ df_processed = load_and_process_data('GeminiCheck.csv')
 
 st.title("Recruitment Dashboard")
 st.sidebar.header("Filters")
+
+# --- Toggle para Dark Mode e Cores Customizadas ---
+dark_mode = st.sidebar.toggle('Dark Mode', value=True)
+chart_template = 'plotly_dark' if dark_mode else 'plotly_white'
+custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
+
 
 # --- Lógica de Filtros Dinâmicos ---
 df_filtered = df_processed.copy()
@@ -70,7 +75,6 @@ st.header("Recruitment Overview")
 if df_filtered.empty:
     st.warning("No data available for the selected filters.")
 else:
-    # --- KPIs ---
     completes_needed = df_filtered['allocated_completes'].sum()
     panelists_needed = df_filtered['Pessoas_Para_Recrutar'].sum()
 
@@ -78,9 +82,8 @@ else:
     kpi1.metric(label="Completes Needed", value=f"{completes_needed:,}")
     kpi2.metric(label="Panelists Needed", value=f"{panelists_needed:,}")
     
-    st.markdown("---") # Adiciona uma linha divisória
+    st.markdown("---")
 
-    # --- Gráficos ---
     col1, col2 = st.columns(2)
 
     with col1:
@@ -89,7 +92,7 @@ else:
             by_age, x='age_group', y='Pessoas_Para_Recrutar',
             title='Demand by Age Group',
             labels={'age_group': 'Age Group', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Pastel
+            template=chart_template, color_discrete_sequence=custom_colors
         )
         st.plotly_chart(fig_age, use_container_width=True)
 
@@ -98,7 +101,7 @@ else:
         fig_gender = px.pie(
             by_gender, names='Gender', values='Pessoas_Para_Recrutar',
             title='Demand by Gender', hole=0.3,
-            template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Pastel
+            template=chart_template, color_discrete_sequence=custom_colors
         )
         st.plotly_chart(fig_gender, use_container_width=True)
 
@@ -110,7 +113,7 @@ else:
             by_country, x='pais', y='Pessoas_Para_Recrutar',
             title='Demand by Country',
             labels={'pais': 'Country', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Vivid
+            template=chart_template, color_discrete_sequence=custom_colors
         )
         st.plotly_chart(fig_country, use_container_width=True)
         
@@ -120,7 +123,7 @@ else:
             by_sel, x='SEL', y='Pessoas_Para_Recrutar',
             title='Demand by Socioeconomic Level (SEL)',
             labels={'SEL': 'Socioeconomic Level', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Vivid
+            template=chart_template, color_discrete_sequence=custom_colors
         )
         st.plotly_chart(fig_sel, use_container_width=True)
 
