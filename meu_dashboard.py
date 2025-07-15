@@ -22,12 +22,16 @@ def load_and_process_data(file_path):
 
     df.rename(columns={'country': 'pais'}, inplace=True)
     
-    df_clean = df[['pais', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar']].copy()
+    # Adicionada a coluna 'allocated_completes'
+    df_clean = df[['pais', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes']].copy()
     
     df_clean['Pessoas_Para_Recrutar'] = pd.to_numeric(df_clean['Pessoas_Para_Recrutar'], errors='coerce')
-    df_clean.dropna(subset=['Pessoas_Para_Recrutar', 'age_group', 'SEL', 'Gender'], inplace=True)
-    df_clean['Pessoas_Para_Recrutar'] = df_clean['Pessoas_Para_Recrutar'].astype(int)
+    df_clean['allocated_completes'] = pd.to_numeric(df_clean['allocated_completes'], errors='coerce')
     
+    df_clean.dropna(subset=['Pessoas_Para_Recrutar', 'allocated_completes', 'age_group', 'SEL', 'Gender'], inplace=True)
+    df_clean['Pessoas_Para_Recrutar'] = df_clean['Pessoas_Para_Recrutar'].astype(int)
+    df_clean['allocated_completes'] = df_clean['allocated_completes'].astype(int)
+
     return df_clean
 
 df_processed = load_and_process_data('GeminiCheck.csv')
@@ -38,45 +42,45 @@ st.sidebar.header("Filters")
 # --- Lógica de Filtros Dinâmicos ---
 df_filtered = df_processed.copy()
 
-# Filtro de País (sempre visível)
 countries = sorted(df_filtered['pais'].unique())
 selected_countries = st.sidebar.multiselect('Select Country(s)', countries, default=countries)
 if selected_countries:
     df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
 
-# Filtro de Faixa Etária (condicional)
 age_groups = sorted(df_filtered['age_group'].unique())
 if len(age_groups) > 1:
     selected_age_groups = st.sidebar.multiselect('Select Age Group(s)', age_groups, default=age_groups)
     if selected_age_groups:
         df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
-else:
-    selected_age_groups = age_groups
 
-# Filtro de Gênero (condicional)
 genders = sorted(df_filtered['Gender'].unique())
 if len(genders) > 1:
     selected_genders = st.sidebar.multiselect('Select Gender(s)', genders, default=genders)
     if selected_genders:
         df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
-else:
-    selected_genders = genders
 
-# Filtro de SEL (condicional)
 sels = sorted(df_filtered['SEL'].unique())
 if len(sels) > 1:
     selected_sels = st.sidebar.multiselect('Select SEL(s)', sels, default=sels)
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
-else:
-    selected_sels = sels
-
 
 st.header("Recruitment Overview")
 
 if df_filtered.empty:
     st.warning("No data available for the selected filters.")
 else:
+    # --- KPIs ---
+    completes_needed = df_filtered['allocated_completes'].sum()
+    panelists_needed = df_filtered['Pessoas_Para_Recrutar'].sum()
+
+    kpi1, kpi2 = st.columns(2)
+    kpi1.metric(label="Completes Needed", value=f"{completes_needed:,}")
+    kpi2.metric(label="Panelists Needed", value=f"{panelists_needed:,}")
+    
+    st.markdown("---") # Adiciona uma linha divisória
+
+    # --- Gráficos ---
     col1, col2 = st.columns(2)
 
     with col1:
@@ -94,7 +98,6 @@ else:
         fig_gender = px.pie(
             by_gender, names='Gender', values='Pessoas_Para_Recrutar',
             title='Demand by Gender', hole=0.3,
-            labels={'Gender': 'Gender', 'Pessoas_Para_Recrutar': 'People to Recruit'},
             template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Pastel
         )
         st.plotly_chart(fig_gender, use_container_width=True)
