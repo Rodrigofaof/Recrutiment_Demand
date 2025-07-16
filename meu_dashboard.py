@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
-df = pd.read_csv('GeminiCheck.csv')
+import os
+from datetime import datetime
 
 # Define a configuração da página para iniciar com o tema claro (fundo branco)
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
@@ -36,9 +36,17 @@ def load_and_process_data(file_path):
 
     return df_clean
 
-df_processed = load_and_process_data('GeminiCheck.csv')
+# --- Carrega os dados e obtém a data de atualização do arquivo ---
+data_file_path = 'GeminiCheck.csv'
+df_processed = load_and_process_data(data_file_path)
+last_update_unix = os.path.getmtime(data_file_path)
+last_update_readable = datetime.fromtimestamp(last_update_unix)
+formatted_last_update = last_update_readable.strftime("%d/%m/%Y %H:%M:%S")
+
 
 st.title("Recruitment Dashboard")
+st.caption(f"Last data update: {formatted_last_update}") # INFORMAÇÃO DA ATUALIZAÇÃO
+
 st.sidebar.header("Filters")
 
 # Cores personalizadas que você pediu
@@ -94,7 +102,6 @@ else:
             labels={'age_group': 'Age Group', 'Pessoas_Para_Recrutar': 'People to Recruit'},
             color_discrete_sequence=custom_colors
         )
-        # Removemos o template para que ele se adapte ao tema do Streamlit
         fig_age.update_layout(template="streamlit")
         st.plotly_chart(fig_age, use_container_width=True)
 
