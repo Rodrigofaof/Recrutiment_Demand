@@ -3,8 +3,8 @@ import pandas as pd
 import plotly.express as px
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
-# Define a configuração da página para iniciar com o tema claro (fundo branco)
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 def load_and_process_data(file_path):
@@ -36,23 +36,24 @@ def load_and_process_data(file_path):
 
     return df_clean
 
-# --- Carrega os dados e obtém a data de atualização do arquivo ---
 data_file_path = 'GeminiCheck.csv'
 df_processed = load_and_process_data(data_file_path)
-last_update_unix = os.path.getmtime(data_file_path)
-last_update_readable = datetime.fromtimestamp(last_update_unix)
-formatted_last_update = last_update_readable.strftime("%d/%m/%Y %H:%M:%S")
 
+last_update_unix = os.path.getmtime(data_file_path)
+utc_time = datetime.fromtimestamp(last_update_unix, ZoneInfo("UTC"))
+br_timezone = ZoneInfo("America/Sao_Paulo")
+br_time = utc_time.astimezone(br_timezone)
+gmt_offset = br_time.strftime("%z")
+formatted_gmt = f"GMT{gmt_offset[:-2]}"
+formatted_last_update = br_time.strftime(f"%d/%m/%Y %H:%M:%S ({formatted_gmt})")
 
 st.title("Recruitment Dashboard")
-st.caption(f"Last data update: {formatted_last_update}") # INFORMAÇÃO DA ATUALIZAÇÃO
+st.caption(f"Last data update: {formatted_last_update}")
 
 st.sidebar.header("Filters")
 
-# Cores personalizadas que você pediu
 custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
 
-# --- Lógica de Filtros Dinâmicos ---
 df_filtered = df_processed.copy()
 
 countries = sorted(df_filtered['pais'].unique())
