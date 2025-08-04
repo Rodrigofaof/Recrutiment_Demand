@@ -141,21 +141,14 @@ with tab2:
         ProjetosNecessarios = pd.read_csv("Projects.csv")
         ProjetosNecessarios = ProjetosNecessarios.sort_values(by='expectedcompletes', ascending=False)
 
-        ProjetosNecessarios['project_id_clickable'] = ProjetosNecessarios.apply(
-            lambda row: f"[{row['project_id']}](https://sample.offerwise.com/project/{row['project_id']})",
-            axis=1
-        )
+        def make_clickable(project_id):
+            return f'<a target="_blank" href="https://sample.offerwise.com/project/{project_id}">{project_id}</a>'
+
+        ProjetosNecessarios['project_id'] = ProjetosNecessarios['project_id'].apply(make_clickable)
         
-        cols_to_display = ['project_id_clickable'] + [col for col in ProjetosNecessarios.columns if col not in ['project_id', 'project_id_clickable']]
+        html = ProjetosNecessarios.to_html(escape=False, index=False)
         
-        st.dataframe(
-            ProjetosNecessarios[cols_to_display],
-            column_config={
-                "project_id_clickable": "Project ID"
-            },
-            hide_index=True,
-            use_container_width=True
-        )
+        st.write(html, unsafe_allow_html=True)
 
     except FileNotFoundError:
         st.warning("O arquivo 'Projects.csv' não foi encontrado. Por favor, crie o arquivo e adicione-o ao repositório.")
