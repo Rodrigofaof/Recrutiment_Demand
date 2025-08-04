@@ -141,19 +141,22 @@ with tab2:
         ProjetosNecessarios = pd.read_csv("Projects.csv")
         ProjetosNecessarios = ProjetosNecessarios.sort_values(by='expectedcompletes', ascending=False)
 
-        ProjetosNecessarios['link'] = "https://sample.offerwise.com/project/" + ProjetosNecessarios['project_id'].astype(str)
-
-        st.data_editor(
-            ProjetosNecessarios,
+        ProjetosNecessarios['project_id_clickable'] = ProjetosNecessarios.apply(
+            lambda row: f"[{row['project_id']}](https://sample.offerwise.com/project/{row['project_id']})",
+            axis=1
+        )
+        
+        cols_to_display = ['project_id_clickable'] + [col for col in ProjetosNecessarios.columns if col not in ['project_id', 'project_id_clickable']]
+        
+        st.dataframe(
+            ProjetosNecessarios[cols_to_display],
             column_config={
-                "project_id": "Project ID",
-                "link": st.column_config.LinkColumn(
-                    "Project Link",
-                    display_text="Open Project Page"
-                )
+                "project_id_clickable": "Project ID"
             },
             hide_index=True,
+            use_container_width=True
         )
+
     except FileNotFoundError:
         st.warning("O arquivo 'Projects.csv' não foi encontrado. Por favor, crie o arquivo e adicione-o ao repositório.")
         dados_exemplo = {
