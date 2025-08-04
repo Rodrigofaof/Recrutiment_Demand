@@ -142,7 +142,7 @@ with tab2:
         ProjetosNecessarios = ProjetosNecessarios.sort_values(by='expectedcompletes', ascending=False)
 
         def make_clickable(project_id):
-            return f'<a target="_blank" href="https://sample.offerwise.com/project/{project_id}">{project_id}</a>'
+            return f'<a target="_blank" href="https://sample.offerwise.com/project/stats/{project_id}">{project_id}</a>'
 
         ProjetosNecessarios['project_id'] = ProjetosNecessarios['project_id'].apply(make_clickable)
         
