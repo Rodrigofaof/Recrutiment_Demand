@@ -143,20 +143,19 @@ with tab2:
     
     st.header("Necessary Projects")
     
-    # --- DADOS DE EXEMPLO PARA ProjetosNecessarios ---
-    # Substitua esta parte pela sua variável real
     try:
-        # Tenta usar a variável ProjetosNecessarios se ela existir no seu ambiente
         ProjetosNecessarios.head() 
     except NameError:
-        # Se não existir, cria um exemplo
+        st.info("Atenção: A variável 'ProjetosNecessarios' não foi encontrada. Usando dados de exemplo.")
+        # CORREÇÃO: Define a variável 'dados_exemplo' ANTES de usá-la.
+        dados_exemplo = {
+            'project_id': [149332, 149631, 155710, 155906],
+            'status': ['Live', 'Closed', 'Live', 'Paused']
+        }
         ProjetosNecessarios = pd.DataFrame(dados_exemplo)
-    # --- FIM DOS DADOS DE EXEMPLO ---
 
-    # Cria uma nova coluna com a URL completa
     ProjetosNecessarios['link'] = "https://sample.offerwise.com/project/" + ProjetosNecessarios['project_id'].astype(str)
 
-    # Usa o st.data_editor com column_config para criar os links
     st.data_editor(
         ProjetosNecessarios,
         column_config={
