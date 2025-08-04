@@ -166,4 +166,3 @@ with tab2:
         }
         st.info("Mostrando dados de exemplo:")
         st.dataframe(pd.DataFrame(dados_exemplo))
-
