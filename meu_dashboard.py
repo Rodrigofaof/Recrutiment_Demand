@@ -150,11 +150,6 @@ with tab2:
         ProjetosNecessarios.head() 
     except NameError:
         # Se não existir, cria um exemplo
-        st.info("Atenção: A variável 'ProjetosNecessarios' não foi encontrada. Usando dados de exemplo.")
-        dados_exemplo = {
-            'project_id': [149332, 149631, 155710, 155906],
-            'status': ['Live', 'Closed', 'Live', 'Paused']
-        }
         ProjetosNecessarios = pd.DataFrame(dados_exemplo)
     # --- FIM DOS DADOS DE EXEMPLO ---
 
