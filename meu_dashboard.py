@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -112,7 +111,6 @@ else:
         fig_gender = px.pie(
             by_gender, names='Gender', values='Pessoas_Para_Recrutar',
             title='Demand by Gender', hole=0.3,
-            labels={'Gender': 'Gender', 'Pessoas_Para_Recrutar': 'People to Recruit'},
             color_discrete_sequence=custom_colors
         )
         fig_gender.update_layout(template="streamlit")
