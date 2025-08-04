@@ -130,40 +130,37 @@ with tab2:
         st.warning("No data available for the selected filters.")
     else:
         st.dataframe(df_filtered)
-
-        @st.cache_data
-        def convert_df_to_csv(df):
-            return df.to_csv(index=False).encode('utf-8')
-
-        csv = convert_df_to_csv(df_filtered)
-
-        st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='filtered_recruitment_data.csv', mime='text/csv')
+        csv_filtered = df_filtered.to_csv(index=False).encode('utf-8')
+        st.download_button(label="Download Filtered Data as CSV", data=csv_filtered, file_name='filtered_recruitment_data.csv', mime='text/csv')
 
     st.markdown("---")
     
     st.header("Necessary Projects")
     
     try:
-        ProjetosNecessarios.head() 
-    except NameError:
-        st.info("Atenção: A variável 'ProjetosNecessarios' não foi encontrada. Usando dados de exemplo.")
-        # CORREÇÃO: Define a variável 'dados_exemplo' ANTES de usá-la.
+        ProjetosNecessarios = pd.read_csv("Projects.csv")
+        ProjetosNecessarios = ProjetosNecessarios.sort_values(by='expectedcompletes', ascending=False)
+
+        ProjetosNecessarios['link'] = "https://sample.offerwise.com/project/" + ProjetosNecessarios['project_id'].astype(str)
+
+        st.data_editor(
+            ProjetosNecessarios,
+            column_config={
+                "project_id": "Project ID",
+                "link": st.column_config.LinkColumn(
+                    "Project Link",
+                    display_text="Open Project Page"
+                )
+            },
+            hide_index=True,
+        )
+    except FileNotFoundError:
+        st.warning("O arquivo 'Projects.csv' não foi encontrado. Por favor, crie o arquivo e adicione-o ao repositório.")
         dados_exemplo = {
-            'project_id': [149332, 149631, 155710, 155906],
-            'status': ['Live', 'Closed', 'Live', 'Paused']
+            'project_id': [101, 102, 103],
+            'expectedcompletes': [100, 200, 50],
+            'status': ['Live', 'Paused', 'Live']
         }
-        ProjetosNecessarios = pd.DataFrame(dados_exemplo)
+        st.info("Mostrando dados de exemplo:")
+        st.dataframe(pd.DataFrame(dados_exemplo))
 
-    ProjetosNecessarios['link'] = "https://sample.offerwise.com/project/" + ProjetosNecessarios['project_id'].astype(str)
-
-    st.data_editor(
-        ProjetosNecessarios,
-        column_config={
-            "project_id": "Project ID",
-            "link": st.column_config.LinkColumn(
-                "Project Link",
-                display_text="Open Project Page"
-            )
-        },
-        hide_index=True,
-    )
