@@ -79,79 +79,97 @@ if len(sels) > 1:
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
-st.header("Recruitment Overview")
+tab1, tab2 = st.tabs(["Dashboard", "Data Tables"])
 
-if df_filtered.empty:
-    st.warning("No data available for the selected filters.")
-else:
-    completes_needed = df_filtered['allocated_completes'].sum()
-    panelists_needed = df_filtered['Pessoas_Para_Recrutar'].sum()
+with tab1:
+    st.header("Recruitment Overview")
 
-    kpi1, kpi2 = st.columns(2)
-    kpi1.metric(label="Completes Needed", value=f"{completes_needed:,}")
-    kpi2.metric(label="Panelists Needed", value=f"{panelists_needed:,}")
-    
-    st.markdown("---")
+    if df_filtered.empty:
+        st.warning("No data available for the selected filters.")
+    else:
+        completes_needed = df_filtered['allocated_completes'].sum()
+        panelists_needed = df_filtered['Pessoas_Para_Recrutar'].sum()
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        by_age = df_filtered.groupby('age_group')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
-        fig_age = px.bar(
-            by_age, x='age_group', y='Pessoas_Para_Recrutar',
-            title='Demand by Age Group',
-            labels={'age_group': 'Age Group', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            color_discrete_sequence=custom_colors
-        )
-        fig_age.update_layout(template="streamlit")
-        st.plotly_chart(fig_age, use_container_width=True)
-
-    with col2:
-        by_gender = df_filtered.groupby('Gender')['Pessoas_Para_Recrutar'].sum().reset_index()
-        fig_gender = px.pie(
-            by_gender, names='Gender', values='Pessoas_Para_Recrutar',
-            title='Demand by Gender', hole=0.3,
-            color_discrete_sequence=custom_colors
-        )
-        fig_gender.update_layout(template="streamlit")
-        st.plotly_chart(fig_gender, use_container_width=True)
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        by_country = df_filtered.groupby('pais')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
-        fig_country = px.bar(
-            by_country, x='pais', y='Pessoas_Para_Recrutar',
-            title='Demand by Country',
-            labels={'pais': 'Country', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            color_discrete_sequence=custom_colors
-        )
-        fig_country.update_layout(template="streamlit")
-        st.plotly_chart(fig_country, use_container_width=True)
+        kpi1, kpi2 = st.columns(2)
+        kpi1.metric(label="Completes Needed", value=f"{completes_needed:,}")
+        kpi2.metric(label="Panelists Needed", value=f"{panelists_needed:,}")
         
-    with col4:
-        by_sel = df_filtered.groupby('SEL')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
-        fig_sel = px.bar(
-            by_sel, x='SEL', y='Pessoas_Para_Recrutar',
-            title='Demand by Socioeconomic Level (SEL)',
-            labels={'SEL': 'Socioeconomic Level', 'Pessoas_Para_Recrutar': 'People to Recruit'},
-            color_discrete_sequence=custom_colors
-        )
-        fig_sel.update_layout(template="streamlit")
-        st.plotly_chart(fig_sel, use_container_width=True)
+        st.markdown("---")
 
-    st.write("Detailed Data:")
-    st.dataframe(df_filtered)
+        col1, col2 = st.columns(2)
 
-    @st.cache_data
-    def convert_df_to_csv(df):
-        return df.to_csv(index=False).encode('utf-8')
+        with col1:
+            by_age = df_filtered.groupby('age_group')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+            fig_age = px.bar(by_age, x='age_group', y='Pessoas_Para_Recrutar', title='Demand by Age Group', labels={'age_group': 'Age Group', 'Pessoas_Para_Recrutar': 'People to Recruit'}, color_discrete_sequence=custom_colors)
+            fig_age.update_layout(template="streamlit")
+            st.plotly_chart(fig_age, use_container_width=True)
 
-    csv = convert_df_to_csv(df_filtered)
+        with col2:
+            by_gender = df_filtered.groupby('Gender')['Pessoas_Para_Recrutar'].sum().reset_index()
+            fig_gender = px.pie(by_gender, names='Gender', values='Pessoas_Para_Recrutar', title='Demand by Gender', hole=0.3, color_discrete_sequence=custom_colors)
+            fig_gender.update_layout(template="streamlit")
+            st.plotly_chart(fig_gender, use_container_width=True)
 
-    st.download_button(
-       label="Download data as CSV",
-       data=csv,
-       file_name='filtered_recruitment_data.csv',
-       mime='text/csv',
+        col3, col4 = st.columns(2)
+
+        with col3:
+            by_country = df_filtered.groupby('pais')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+            fig_country = px.bar(by_country, x='pais', y='Pessoas_Para_Recrutar', title='Demand by Country', labels={'pais': 'Country', 'Pessoas_Para_Recrutar': 'People to Recruit'}, color_discrete_sequence=custom_colors)
+            fig_country.update_layout(template="streamlit")
+            st.plotly_chart(fig_country, use_container_width=True)
+            
+        with col4:
+            by_sel = df_filtered.groupby('SEL')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+            fig_sel = px.bar(by_sel, x='SEL', y='Pessoas_Para_Recrutar', title='Demand by Socioeconomic Level (SEL)', labels={'SEL': 'Socioeconomic Level', 'Pessoas_Para_Recrutar': 'People to Recruit'}, color_discrete_sequence=custom_colors)
+            fig_sel.update_layout(template="streamlit")
+            st.plotly_chart(fig_sel, use_container_width=True)
+
+with tab2:
+    st.header("Detailed Filtered Data")
+    if df_filtered.empty:
+        st.warning("No data available for the selected filters.")
+    else:
+        st.dataframe(df_filtered)
+
+        @st.cache_data
+        def convert_df_to_csv(df):
+            return df.to_csv(index=False).encode('utf-8')
+
+        csv = convert_df_to_csv(df_filtered)
+
+        st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='filtered_recruitment_data.csv', mime='text/csv')
+
+    st.markdown("---")
+    
+    st.header("Necessary Projects")
+    
+    # --- DADOS DE EXEMPLO PARA ProjetosNecessarios ---
+    # Substitua esta parte pela sua variável real
+    try:
+        # Tenta usar a variável ProjetosNecessarios se ela existir no seu ambiente
+        ProjetosNecessarios.head() 
+    except NameError:
+        # Se não existir, cria um exemplo
+        st.info("Atenção: A variável 'ProjetosNecessarios' não foi encontrada. Usando dados de exemplo.")
+        dados_exemplo = {
+            'project_id': [149332, 149631, 155710, 155906],
+            'status': ['Live', 'Closed', 'Live', 'Paused']
+        }
+        ProjetosNecessarios = pd.DataFrame(dados_exemplo)
+    # --- FIM DOS DADOS DE EXEMPLO ---
+
+    # Cria uma nova coluna com a URL completa
+    ProjetosNecessarios['link'] = "https://sample.offerwise.com/project/" + ProjetosNecessarios['project_id'].astype(str)
+
+    # Usa o st.data_editor com column_config para criar os links
+    st.data_editor(
+        ProjetosNecessarios,
+        column_config={
+            "project_id": "Project ID",
+            "link": st.column_config.LinkColumn(
+                "Project Link",
+                display_text="Open Project Page"
+            )
+        },
+        hide_index=True,
     )
