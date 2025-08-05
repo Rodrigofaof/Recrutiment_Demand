@@ -149,6 +149,8 @@ with tab2:
         html = ProjetosNecessarios.to_html(escape=False, index=False)
         
         st.write(html, unsafe_allow_html=True)
+        st.download_button(label="Download Filtered Data as CSV", data=csv_filtered, file_name='Necessary_Projects.csv', mime='text/csv')
+
 
     except FileNotFoundError:
         st.warning("O arquivo 'Projects.csv' não foi encontrado. Por favor, crie o arquivo e adicione-o ao repositório.")
