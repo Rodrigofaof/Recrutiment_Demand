@@ -66,6 +66,8 @@ if df_processed is None:
     st.stop()
 
 st.sidebar.header("Filtros")
+custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
+
 all_projects = sorted(df_processed['project_id'].unique())
 selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
 
@@ -73,17 +75,65 @@ df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if se
 all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
 selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
+all_countries = sorted(df_temp['pais'].dropna().unique())
+selected_countries = st.sidebar.multiselect('País', all_countries, default=all_countries)
+
+all_age_groups = sorted(df_temp['age_group'].dropna().unique())
+selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups, default=all_age_groups)
+
+all_genders = sorted(df_temp['Gender'].dropna().unique())
+selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_genders)
+
+all_sels = sorted(df_temp['SEL'].dropna().unique())
+selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
+
 df_filtered = df_processed.copy()
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 if selected_labels:
     df_filtered = df_filtered[df_filtered['QuotaLabel'].isin(selected_labels)]
+if selected_countries:
+    df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
+if selected_age_groups:
+    df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
+if selected_genders:
+    df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
+if selected_sels:
+    df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
 tab1, tab2, tab3 = st.tabs(["Dashboard Geral", "Fluxo Sankey", "Tabelas"])
 
 with tab1:
     st.header("Visão Geral do Recrutamento")
-    # Gráficos e KPIs aqui...
+    if df_filtered.empty:
+        st.warning("Nenhum dado encontrado para os filtros selecionados.")
+    else:
+        completes_needed = df_filtered['allocated_completes'].sum()
+        panelists_needed = df_filtered['Pessoas_Para_Recrutar'].sum()
+        kpi1, kpi2 = st.columns(2)
+        kpi1.metric(label="Completes Necessários (Alocados)", value=f"{completes_needed:,}")
+        kpi2.metric(label="Painelistas Necessários", value=f"{panelists_needed:,}")
+        st.markdown("---")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            by_age = df_filtered.groupby('age_group')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+            fig_age = px.bar(by_age, x='age_group', y='Pessoas_Para_Recrutar', title='Demanda por Faixa Etária', labels={'age_group': 'Faixa Etária', 'Pessoas_Para_Recrutar': 'Pessoas para Recrutar'}, color_discrete_sequence=custom_colors)
+            st.plotly_chart(fig_age, use_container_width=True)
+        with col2:
+            by_gender = df_filtered.groupby('Gender')['Pessoas_Para_Recrutar'].sum().reset_index()
+            fig_gender = px.pie(by_gender, names='Gender', values='Pessoas_Para_Recrutar', title='Demanda por Gênero', hole=0.3, color_discrete_sequence=custom_colors)
+            st.plotly_chart(fig_gender, use_container_width=True)
+
+        col3, col4 = st.columns(2)
+        with col3:
+            by_country = df_filtered.groupby('pais')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+            fig_country = px.bar(by_country, x='pais', y='Pessoas_Para_Recrutar', title='Demanda por País', labels={'pais': 'País', 'Pessoas_Para_Recrutar': 'Pessoas para Recrutar'}, color_discrete_sequence=custom_colors)
+            st.plotly_chart(fig_country, use_container_width=True)
+        with col4:
+            by_sel = df_filtered.groupby('SEL')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+            fig_sel = px.bar(by_sel, x='SEL', y='Pessoas_Para_Recrutar', title='Demanda por Classe Social (SEL)', labels={'SEL': 'Classe Social', 'Pessoas_Para_Recrutar': 'Pessoas para Recrutar'}, color_discrete_sequence=custom_colors)
+            st.plotly_chart(fig_sel, use_container_width=True)
 
 with tab2:
     st.header("Fluxo de Distribuição da Cota")
@@ -93,10 +143,44 @@ with tab2:
         st.warning("Nenhum dado para os filtros.")
     else:
         df_sankey = df_filtered.copy().dropna(subset=['QuotaLabel', 'age_group', 'Gender', 'SEL'])
-        # Lógica do Sankey aqui...
+        if not df_sankey.empty:
+            df_sankey['source_project'] = 'Projeto: ' + df_sankey['project_id']
+            all_nodes = list(pd.unique(df_sankey[['source_project', 'QuotaLabel', 'age_group', 'Gender', 'SEL']].values.ravel('K')))
+            node_map = {node: i for i, node in enumerate(all_nodes)}
+            
+            source, target, value = [], [], []
+            
+            flows = [
+                df_sankey.groupby(['source_project', 'QuotaLabel']),
+                df_sankey.groupby(['QuotaLabel', 'age_group']),
+                df_sankey.groupby(['age_group', 'Gender']),
+                df_sankey.groupby(['Gender', 'SEL'])
+            ]
+            
+            for flow_data in flows:
+                df_grouped = flow_data['allocated_completes'].sum().reset_index()
+                if not df_grouped.empty:
+                    source_col, target_col = df_grouped.columns[0], df_grouped.columns[1]
+                    source.extend(df_grouped[source_col].map(node_map))
+                    target.extend(df_grouped[target_col].map(node_map))
+                    value.extend(df_grouped['allocated_completes'])
+
+            fig_sankey = go.Figure(data=[go.Sankey(
+                node = dict(pad=15, thickness=20, line=dict(color="black", width=0.5), label=all_nodes, color="#25406e"),
+                link = dict(source=source, target=target, value=value, color="rgba(107,161,255,0.4)")
+            )])
+            fig_sankey.update_layout(title_text="Fluxo do Projeto e Cota para Perfis Demográficos", font_size=12, height=600)
+            st.plotly_chart(fig_sankey, use_container_width=True)
+        else:
+            st.warning("Não há dados de alocação completos para desenhar o fluxo com os filtros atuais.")
 
 with tab3:
     st.header("Tabelas de Dados")
+    st.subheader("Dados Detalhados Filtrados")
     st.dataframe(df_filtered)
+    st.markdown("---")
+    st.subheader("Definição das Cotas Iniciais Correspondentes")
     if not df_projects.empty and not df_filtered.empty:
         st.dataframe(df_projects[df_projects['quota_index'].isin(df_filtered['quota_index'].unique())])
+    else:
+        st.info("Selecione filtros para ver as cotas iniciais.")
