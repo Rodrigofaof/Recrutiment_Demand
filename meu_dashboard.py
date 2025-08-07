@@ -57,7 +57,7 @@ custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
 df_filtered = df_processed.copy()
 
 projects = sorted(df_filtered['project_id'].unique())
-selected_projects = st.sidebar.multiselect('Select Project(s)', projects, default=projects)
+selected_projects = st.sidebar.multiselect('Select Project(s)', projects, default=None, placeholder="Escolha um ou mais projetos")
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 
@@ -125,8 +125,11 @@ with tab1:
 
 with tab2:
     st.header("Completes Allocation Flow")
-    if df_filtered.empty or len(df_filtered['project_id'].unique()) == 0:
-        st.warning("No data to display. Please select at least one project and other filters.")
+
+    if not selected_projects:
+        st.info("⬅️ Para gerar o gráfico, por favor, selecione um ou mais projetos no filtro da barra lateral.")
+    elif df_filtered.empty:
+        st.warning("Não há dados para a combinação de filtros selecionada.")
     else:
         df_sankey = df_filtered.copy()
         
@@ -158,7 +161,7 @@ with tab2:
               thickness = 20,
               line = dict(color = "black", width = 0.5),
               label = all_nodes,
-              color = "blue"
+              color = "#25406e"
             ),
             link = dict(
               source = source,
@@ -166,7 +169,7 @@ with tab2:
               value = value
           ))])
 
-        fig_sankey.update_layout(title_text="Flow from Projects to Demographics", font_size=12, height=600)
+        fig_sankey.update_layout(title_text="Fluxo de Alocação dos Projetos Selecionados", font_size=12, height=600)
         st.plotly_chart(fig_sankey, use_container_width=True)
 
 with tab3:
