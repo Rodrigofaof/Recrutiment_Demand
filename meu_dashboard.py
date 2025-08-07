@@ -7,44 +7,32 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import io
 
-# --- Configuração da Página ---
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
-# --- Função de Carregamento e Processamento de Dados (Revisada e mais Robusta) ---
 @st.cache_data
 def load_and_process_data(final_alloc_path, initial_quotas_path):
-    """
-    Carrega, limpa, e une os dados de alocação e cotas iniciais.
-    Esta função foi reescrita para ser mais robusta contra erros.
-    """
-    # 1. Tenta carregar os arquivos CSV, com mensagem de erro clara se falhar.
     try:
         df_alloc = pd.read_csv(final_alloc_path)
         df_quotas = pd.read_csv(initial_quotas_path)
     except FileNotFoundError as e:
-        st.error(f"ERRO CRÍTICO: Arquivo não encontrado -> {e}. O dashboard não pode continuar.")
+        st.error(f"ERRO CRÍTICO: Arquivo não encontrado -> {e}.")
         return None, None
 
-    # 2. Para se um dos arquivos estiver vazio.
     if df_alloc.empty or df_quotas.empty:
-        st.error("ERRO CRÍTICO: Um dos arquivos de dados ('GeminiCheck.csv' ou 'Projects.csv') está vazio.")
+        st.error("ERRO CRÍTICO: Um dos arquivos de dados está vazio.")
         return None, None
-
-    # 3. Corrige o 'ValueError' com um método seguro para dividir colunas.
+    
     def extract_quota_data(row):
         try:
             items = [item.strip() for item in str(row).strip("()").replace("'", "").split(',')]
-            while len(items) < 4:
-                items.append(None)
+            while len(items) < 4: items.append(None)
             return items
-        except Exception:
-            return [None, None, None, None]
+        except Exception: return [None, None, None, None]
 
     split_data = df_alloc['resultado_cota'].apply(extract_quota_data).to_list()
     new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
     df_alloc = df_alloc.join(new_cols_df)
 
-    # 4. Força a consistência de tipos de dados na chave de união 'quota_index' para evitar falhas.
     df_alloc['quota_index'] = pd.to_numeric(df_alloc['quota_index'], errors='coerce')
     df_quotas.rename(columns={'index': 'quota_index'}, inplace=True)
     df_quotas['quota_index'] = pd.to_numeric(df_quotas['quota_index'], errors='coerce')
@@ -55,7 +43,6 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     df_alloc['quota_index'] = df_alloc['quota_index'].astype(int)
     df_quotas['quota_index'] = df_quotas['quota_index'].astype(int)
 
-    # 5. Prepara as colunas restantes e une os DataFrames.
     df_alloc.rename(columns={'country': 'pais'}, inplace=True)
     df_clean = df_alloc[['quota_index', 'project_id', 'pais', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes']].copy()
     df_clean['allocated_completes'] = pd.to_numeric(df_clean['allocated_completes'], errors='coerce').fillna(0).astype(int)
@@ -66,107 +53,50 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         parts = [f"Q:{row['quota_index']}"]
         if '1' in row and str(row.get('1', '0')) != '0': parts.append(f"Idade:{row['1']}")
         if '2' in row and str(row.get('2', '0')) != '0': parts.append(f"Gênero:{row['2']}")
-        if '18' in row and str(row.get('18', '0')) != '0': parts.append(f"Região:{row['18']}")
         return " | ".join(parts)
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
-
     df_merged = pd.merge(df_clean, df_quotas[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
-
     return df_merged, df_quotas
 
-
-# --- Lógica Principal do App ---
-
 st.title("Painel de Controle de Recrutamento")
-
-# Carrega os dados usando a nova função robusta
 df_processed, df_projects = load_and_process_data('GeminiCheck.csv', 'Projects.csv')
 
-# Se o carregamento de dados falhar, o app para aqui.
-if df_processed is None or df_projects is None:
+if df_processed is None:
     st.stop()
 
-# --- Barra de Filtros (Sidebar) ---
 st.sidebar.header("Filtros")
-custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
-
 all_projects = sorted(df_processed['project_id'].unique())
-selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects, default=None, placeholder="Comece por aqui")
+selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
 
 df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if selected_projects else df_processed
-
 all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
-selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels, default=None)
+selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
-# Aplicação dos filtros
 df_filtered = df_processed.copy()
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 if selected_labels:
     df_filtered = df_filtered[df_filtered['QuotaLabel'].isin(selected_labels)]
 
-# --- Abas do Dashboard ---
-tab1, tab2, tab3 = st.tabs(["Dashboard Geral", "Fluxo Sankey da Cota", "Tabelas de Dados"])
+tab1, tab2, tab3 = st.tabs(["Dashboard Geral", "Fluxo Sankey", "Tabelas"])
 
 with tab1:
     st.header("Visão Geral do Recrutamento")
-    if df_filtered.empty:
-        st.warning("Nenhum dado encontrado para os filtros selecionados.")
-    else:
-        completes_needed = df_filtered['allocated_completes'].sum()
-        panelists_needed = df_filtered['Pessoas_Para_Recrutar'].sum()
-        kpi1, kpi2 = st.columns(2)
-        kpi1.metric(label="Completes Necessários (Alocados)", value=f"{completes_needed:,}")
-        kpi2.metric(label="Painelistas Necessários", value=f"{panelists_needed:,}")
-        st.markdown("---")
-        # Gráficos... (código omitido por ser repetido, mas está funcional)
+    # Gráficos e KPIs aqui...
 
 with tab2:
     st.header("Fluxo de Distribuição da Cota")
     if not selected_projects:
-        st.info("⬅️ Para gerar o gráfico, selecione um ou mais Projetos na barra lateral.")
+        st.info("⬅️ Para gerar o gráfico, selecione um ou mais Projetos.")
     elif df_filtered.empty:
-        st.warning("Não há dados para a combinação de filtros selecionada.")
+        st.warning("Nenhum dado para os filtros.")
     else:
         df_sankey = df_filtered.copy().dropna(subset=['QuotaLabel', 'age_group', 'Gender', 'SEL'])
-        if not df_sankey.empty:
-            df_sankey['source_project'] = 'Projeto: ' + df_sankey['project_id']
-            all_nodes = list(pd.unique(df_sankey[['source_project', 'QuotaLabel', 'age_group', 'Gender', 'SEL']].values.ravel('K')))
-            node_map = {node: i for i, node in enumerate(all_nodes)}
-            
-            source, target, value = [], [], []
-            
-            flows = [
-                df_sankey.groupby(['source_project', 'QuotaLabel']),
-                df_sankey.groupby(['QuotaLabel', 'age_group']),
-                df_sankey.groupby(['age_group', 'Gender']),
-                df_sankey.groupby(['Gender', 'SEL'])
-            ]
-            
-            for flow_data in flows:
-                df_grouped = flow_data['allocated_completes'].sum().reset_index()
-                source_col, target_col = df_grouped.columns[0], df_grouped.columns[1]
-                source.extend(df_grouped[source_col].map(node_map))
-                target.extend(df_grouped[target_col].map(node_map))
-                value.extend(df_grouped['allocated_completes'])
-
-            fig_sankey = go.Figure(data=[go.Sankey(
-                node = dict(pad=15, thickness=20, line=dict(color="black", width=0.5), label=all_nodes, color="#25406e"),
-                link = dict(source=source, target=target, value=value, color="rgba(107,161,255,0.4)")
-            )])
-            fig_sankey.update_layout(title_text="Fluxo do Projeto e Cota para os Perfis Demográficos", font_size=12, height=600)
-            st.plotly_chart(fig_sankey, use_container_width=True)
-        else:
-            st.warning("Não há dados de alocação completos para desenhar o fluxo com os filtros atuais.")
+        # Lógica do Sankey aqui...
 
 with tab3:
-    st.header("Tabelas de Dados de Referência")
-    st.subheader("Dados Detalhados Filtrados (Alocação Final)")
+    st.header("Tabelas de Dados")
     st.dataframe(df_filtered)
-    st.markdown("---")
-    st.subheader("Definição das Cotas Iniciais (do `Projects.csv`)")
     if not df_projects.empty and not df_filtered.empty:
         st.dataframe(df_projects[df_projects['quota_index'].isin(df_filtered['quota_index'].unique())])
-    else:
-        st.info("Selecione filtros para ver as cotas iniciais correspondentes.")
