@@ -10,6 +10,7 @@ import io
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 @st.cache_data
+@st.cache_data
 def load_and_process_data(final_alloc_path, initial_quotas_path):
     try:
         df_alloc = pd.read_csv(final_alloc_path)
@@ -18,20 +19,15 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         st.error(f"Erro: Arquivo não encontrado - {e}. Verifique se os arquivos '{final_alloc_path}' e '{initial_quotas_path}' estão no lugar certo.")
         return pd.DataFrame(), pd.DataFrame()
 
-    # --- CORREÇÃO CRÍTICA: Garantir tipos de dados consistentes para a chave ---
-    # Força a coluna 'quota_index' a ser numérica em ambos os dataframes, ignorando erros.
     df_alloc['quota_index'] = pd.to_numeric(df_alloc['quota_index'], errors='coerce')
     df_quotas.rename(columns={'index': 'quota_index'}, inplace=True)
     df_quotas['quota_index'] = pd.to_numeric(df_quotas['quota_index'], errors='coerce')
 
-    # Remove linhas onde a chave se tornou nula (porque não era um número válido)
     df_alloc.dropna(subset=['quota_index'], inplace=True)
     df_quotas.dropna(subset=['quota_index'], inplace=True)
 
-    # Converte a chave para inteiro para garantir a correspondência exata.
     df_alloc['quota_index'] = df_alloc['quota_index'].astype(int)
     df_quotas['quota_index'] = df_quotas['quota_index'].astype(int)
-    # --- FIM DA CORREÇÃO ---
 
     def extract_quota_data(row):
         try:
@@ -42,9 +38,17 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         except:
             return None, None, None, None
 
-    df_alloc[['age_group', 'SEL', 'Gender', 'Region']] = df_alloc['resultado_cota'].apply(
-        lambda x: pd.Series(extract_quota_data(x))
-    )
+    # --- CORREÇÃO DA LINHA QUE CAUSA O ValueError ---
+    # 1. Aplicamos a função e criamos uma lista de tuplas
+    split_data = df_alloc['resultado_cota'].apply(extract_quota_data).to_list()
+
+    # 2. Criamos um DataFrame separado com as novas colunas, garantindo o alinhamento pelo índice
+    new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
+    
+    # 3. Juntamos o DataFrame original com as novas colunas
+    df_alloc = df_alloc.join(new_cols_df)
+    # --- FIM DA CORREÇÃO ---
+    
     df_alloc.rename(columns={'country': 'pais'}, inplace=True)
     
     df_clean = df_alloc[['quota_index', 'project_id', 'pais', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes']].copy()
