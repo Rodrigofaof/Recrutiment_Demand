@@ -138,9 +138,9 @@ with tab1:
 with tab2:
     st.header("Fluxo de Distribuição da Cota")
     if not selected_projects:
-        st.info("⬅️ Para gerar o gráfico, selecione um ou mais Projetos.")
+        st.info("⬅️ Para gerar o gráfico, selecione um ou mais Projetos na barra lateral.")
     elif df_filtered.empty:
-        st.warning("Nenhum dado para os filtros.")
+        st.warning("Não há dados para a combinação de filtros selecionada.")
     else:
         df_sankey = df_filtered.copy().dropna(subset=['QuotaLabel', 'age_group', 'Gender', 'SEL'])
         if not df_sankey.empty:
@@ -166,10 +166,34 @@ with tab2:
                     value.extend(df_grouped['allocated_completes'])
 
             fig_sankey = go.Figure(data=[go.Sankey(
-                node = dict(pad=15, thickness=20, line=dict(color="black", width=0.5), label=all_nodes, color="#25406e"),
-                link = dict(source=source, target=target, value=value, color="rgba(107,161,255,0.4)")
+                # --- MUDANÇAS AQUI ---
+                node=dict(
+                    pad=15,
+                    thickness=20,
+                    line=dict(color="black", width=0.5),
+                    label=all_nodes,
+                    # Cor do nó alterada para um cinza claro, para alto contraste com o texto preto
+                    color="lightgray" 
+                ),
+                link=dict(
+                    source=source,
+                    target=target,
+                    value=value,
+                    # Cor do fluxo um pouco mais visível
+                    color="rgba(48, 102, 192, 0.5)" 
+                )
+                # --- FIM DAS MUDANÇAS ---
             )])
-            fig_sankey.update_layout(title_text="Fluxo do Projeto e Cota para Perfis Demográficos", font_size=12, height=600)
+            
+            # --- ATUALIZAÇÃO NO LAYOUT PARA A FONTE ---
+            fig_sankey.update_layout(
+                title_text="Fluxo do Projeto e Cota para Perfis Demográficos",
+                # Define explicitamente o tamanho e a cor da fonte para todo o gráfico
+                font=dict(size=14, color="black"), 
+                height=600
+            )
+            # --- FIM DA ATUALIZAÇÃO ---
+            
             st.plotly_chart(fig_sankey, use_container_width=True)
         else:
             st.warning("Não há dados de alocação completos para desenhar o fluxo com os filtros atuais.")
