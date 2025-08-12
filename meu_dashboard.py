@@ -56,7 +56,16 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         return " | ".join(parts)
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
-    df_merged = pd.merge(df_clean, df_quotas[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
+
+    # --- INÍCIO DA CORREÇÃO ---
+    # Garante que a tabela da direita (df_quotas) tenha apenas uma entrada por quota_index
+    # Isso previne que as linhas de df_clean sejam duplicadas no merge.
+    df_quotas_unique = df_quotas.drop_duplicates(subset=['quota_index'])
+    
+    # Usa a tabela sem duplicatas para a junção
+    df_merged = pd.merge(df_clean, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
+    # --- FIM DA CORREÇÃO ---
+    
     return df_merged, df_quotas
 
 st.title("Painel de Controle de Recrutamento")
@@ -166,34 +175,10 @@ with tab2:
                     value.extend(df_grouped['allocated_completes'])
 
             fig_sankey = go.Figure(data=[go.Sankey(
-                # --- MUDANÇAS AQUI ---
-                node=dict(
-                    pad=15,
-                    thickness=20,
-                    line=dict(color="black", width=0.5),
-                    label=all_nodes,
-                    # Cor do nó alterada para um cinza claro, para alto contraste com o texto preto
-                    color="lightgray" 
-                ),
-                link=dict(
-                    source=source,
-                    target=target,
-                    value=value,
-                    # Cor do fluxo um pouco mais visível
-                    color="rgba(48, 102, 192, 0.5)" 
-                )
-                # --- FIM DAS MUDANÇAS ---
+                node = dict(pad=15, thickness=20, line=dict(color="black", width=0.5), label=all_nodes, color="lightgray"),
+                link = dict(source=source, target=target, value=value, color="rgba(48, 102, 192, 0.5)")
             )])
-            
-            # --- ATUALIZAÇÃO NO LAYOUT PARA A FONTE ---
-            fig_sankey.update_layout(
-                title_text="Fluxo do Projeto e Cota para Perfis Demográficos",
-                # Define explicitamente o tamanho e a cor da fonte para todo o gráfico
-                font=dict(size=14, color="black"), 
-                height=600
-            )
-            # --- FIM DA ATUALIZAÇÃO ---
-            
+            fig_sankey.update_layout(title_text="Fluxo do Projeto e Cota para Perfis Demográficos", font=dict(size=14, color="black"), height=600)
             st.plotly_chart(fig_sankey, use_container_width=True)
         else:
             st.warning("Não há dados de alocação completos para desenhar o fluxo com os filtros atuais.")
