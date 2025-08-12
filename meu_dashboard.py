@@ -96,7 +96,8 @@ selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_ge
 all_sels = sorted(df_temp['SEL'].dropna().unique())
 selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
 
-df_filtered = df_processed.copy()
+df_filtered = df_processed
+
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 if selected_labels:
