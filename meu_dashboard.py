@@ -16,7 +16,6 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         df_quotas = pd.read_csv(initial_quotas_path)
     except FileNotFoundError as e:
         st.error(f"ERRO CRÍTICO: Arquivo não encontrado -> {e}.")
-        st.error(f"Verifique se os caminhos '{final_alloc_path}' e '{initial_quotas_path}' estão corretos.")
         return None, None
 
     if df_alloc.empty or df_quotas.empty:
@@ -33,6 +32,8 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     split_data = df_alloc['resultado_cota'].apply(extract_quota_data).to_list()
     new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
     df_alloc = df_alloc.join(new_cols_df)
+    
+    # A linha problemática de drop_duplicates foi REMOVIDA daqui.
 
     df_alloc['quota_index'] = pd.to_numeric(df_alloc['quota_index'], errors='coerce')
     df_quotas.rename(columns={'index': 'quota_index'}, inplace=True)
@@ -63,15 +64,7 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     return df_merged, df_quotas
 
 st.title("Painel de Controle de Recrutamento")
-
-# --- CORREÇÃO DO CAMINHO DOS ARQUIVOS ---
-# Usando o caminho absoluto para garantir que os arquivos sejam encontrados.
-data_path = "/home/offerwise/Recrutiment_Demand/"
-alloc_file = os.path.join(data_path, 'GeminiCheck.csv')
-projects_file = os.path.join(data_path, 'Projects.csv')
-# --- FIM DA CORREÇÃO ---
-
-df_processed, df_projects = load_and_process_data(alloc_file, projects_file)
+df_processed, df_projects = load_and_process_data('GeminiCheck.csv', 'Projects.csv')
 
 if df_processed is None:
     st.stop()
