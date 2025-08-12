@@ -32,6 +32,16 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     split_data = df_alloc['resultado_cota'].apply(extract_quota_data).to_list()
     new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
     df_alloc = df_alloc.join(new_cols_df)
+    
+    # --- INÍCIO DA CORREÇÃO CONTRA DUPLICATAS ---
+    # Define as colunas que identificam uma alocação única.
+    # Se uma linha tiver a mesma combinação dessas colunas, é uma duplicata.
+    colunas_unicas = ['project_id', 'age_group', 'SEL', 'Gender', 'Region']
+    
+    # Antes de qualquer processamento, remove as linhas duplicadas de df_alloc.
+    # A primeira ocorrência ('keep='first'') é mantida.
+    df_alloc.drop_duplicates(subset=colunas_unicas, keep='first', inplace=True)
+    # --- FIM DA CORREÇÃO ---
 
     df_alloc['quota_index'] = pd.to_numeric(df_alloc['quota_index'], errors='coerce')
     df_quotas.rename(columns={'index': 'quota_index'}, inplace=True)
@@ -57,17 +67,13 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Garante que a tabela da direita (df_quotas) tenha apenas uma entrada por quota_index
-    # Isso previne que as linhas de df_clean sejam duplicadas no merge.
     df_quotas_unique = df_quotas.drop_duplicates(subset=['quota_index'])
     
-    # Usa a tabela sem duplicatas para a junção
     df_merged = pd.merge(df_clean, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
-    # --- FIM DA CORREÇÃO ---
     
     return df_merged, df_quotas
 
+# O restante do seu código continua exatamente o mesmo...
 st.title("Painel de Controle de Recrutamento")
 df_processed, df_projects = load_and_process_data('GeminiCheck.csv', 'Projects.csv')
 
