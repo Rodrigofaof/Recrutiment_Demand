@@ -7,7 +7,7 @@ st.set_page_config(layout="wide")
 st.title("Visualizador de Dados Iniciais")
 st.write("Esta é a versão inicial do painel, focada em carregar e exibir as tabelas de dados brutos para verificação.")
 
-DATA_PATH = "/home/offerwise/Recrutiment_Demand/"
+DATA_PATH = "Recrutiment_Demand/"
 ALLOC_FILE = os.path.join(DATA_PATH, 'GeminiCheck.csv')
 PROJECTS_FILE = os.path.join(DATA_PATH, 'Projects.csv')
 
