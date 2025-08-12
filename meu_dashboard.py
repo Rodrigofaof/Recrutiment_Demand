@@ -22,6 +22,13 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         st.error("ERRO CRÍTICO: Um dos arquivos de dados está vazio.")
         return None, None
     
+    # --- INÍCIO DA CORREÇÃO CONTRA DUPLICATAS ---
+    # Remove duplicatas com base na combinação da cota de origem e do resultado.
+    # Esta é a forma mais segura de garantir que cada alocação única apareça apenas uma vez.
+    if 'quota_index' in df_alloc.columns and 'resultado_cota' in df_alloc.columns:
+        df_alloc.drop_duplicates(subset=['quota_index', 'resultado_cota'], keep='first', inplace=True)
+    # --- FIM DA CORREÇÃO ---
+    
     def extract_quota_data(row):
         try:
             items = [item.strip() for item in str(row).strip("()").replace("'", "").split(',')]
@@ -57,14 +64,9 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Garante que a tabela da direita (df_quotas) tenha apenas uma entrada por quota_index
-    # Isso previne que as linhas de df_clean sejam duplicadas no merge.
     df_quotas_unique = df_quotas.drop_duplicates(subset=['quota_index'])
     
-    # Usa a tabela sem duplicatas para a junção
     df_merged = pd.merge(df_clean, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
-    # --- FIM DA CORREÇÃO ---
     
     return df_merged, df_quotas
 
@@ -85,16 +87,16 @@ all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
 selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
 all_countries = sorted(df_temp['pais'].dropna().unique())
-selected_countries = st.sidebar.multiselect('País', all_countries, default=all_countries)
+selected_countries = st.sidebar.multiselect('País', all_countries)
 
 all_age_groups = sorted(df_temp['age_group'].dropna().unique())
-selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups, default=all_age_groups)
+selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups)
 
 all_genders = sorted(df_temp['Gender'].dropna().unique())
-selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_genders)
+selected_genders = st.sidebar.multiselect('Gênero', all_genders)
 
 all_sels = sorted(df_temp['SEL'].dropna().unique())
-selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
+selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
 
 df_filtered = df_processed.copy()
 if selected_projects:
