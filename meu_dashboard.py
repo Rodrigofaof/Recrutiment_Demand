@@ -59,12 +59,12 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         return " | ".join(parts)
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
-
     df_quotas_unique = df_quotas.drop_duplicates(subset=['quota_index'])
-    
     df_merged = pd.merge(df_clean, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
     
     return df_merged, df_quotas
+
+# --- Lógica Principal do App ---
 
 st.title("Painel de Controle de Recrutamento")
 df_processed, df_projects = load_and_process_data('GeminiCheck.csv', 'Projects.csv')
@@ -75,31 +75,33 @@ if df_processed is None:
 st.sidebar.header("Filtros")
 custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
 
+# --- LÓGICA DE FILTROS CORRIGIDA ---
+
+# 1. Filtro principal de Projeto
 all_projects = sorted(df_processed['project_id'].unique())
 selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
 
+# 2. DataFrame temporário com base na seleção de projetos
 df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if selected_projects else df_processed
+
+# 3. Filtros secundários populados dinamicamente, mas SEM seleção padrão
 all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
 selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
-# --- INÍCIO DA CORREÇÃO ---
-# Os filtros secundários agora começam vazios para evitar conflitos.
 all_countries = sorted(df_temp['pais'].dropna().unique())
-selected_countries = st.sidebar.multiselect('País', all_countries)
+selected_countries = st.sidebar.multiselect('País', all_countries) # default removido
 
 all_age_groups = sorted(df_temp['age_group'].dropna().unique())
-selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups)
+selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups) # default removido
 
 all_genders = sorted(df_temp['Gender'].dropna().unique())
-selected_genders = st.sidebar.multiselect('Gênero', all_genders)
+selected_genders = st.sidebar.multiselect('Gênero', all_genders) # default removido
 
 all_sels = sorted(df_temp['SEL'].dropna().unique())
-selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
-# --- FIM DA CORREÇÃO ---
+selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels) # default removido
 
-
+# 4. Aplicação dos filtros que foram de fato selecionados pelo usuário
 df_filtered = df_processed.copy()
-# A lógica de aplicação dos filtros agora funciona corretamente, pois só aplica os filtros que o usuário de fato selecionou.
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 if selected_labels:
@@ -113,9 +115,10 @@ if selected_genders:
 if selected_sels:
     df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
-# O restante do seu código para as abas continua o mesmo...
+# --- Abas do Dashboard ---
 tab1, tab2, tab3 = st.tabs(["Dashboard Geral", "Fluxo Sankey", "Tabelas"])
 
+# O código das abas (tab1, tab2, tab3) continua o mesmo da versão anterior.
 with tab1:
     st.header("Visão Geral do Recrutamento")
     if df_filtered.empty:
