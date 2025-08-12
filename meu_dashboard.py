@@ -32,6 +32,8 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     split_data = df_alloc['resultado_cota'].apply(extract_quota_data).to_list()
     new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
     df_alloc = df_alloc.join(new_cols_df)
+    
+    # A linha problemática de drop_duplicates foi REMOVIDA daqui.
 
     df_alloc['quota_index'] = pd.to_numeric(df_alloc['quota_index'], errors='coerce')
     df_quotas.rename(columns={'index': 'quota_index'}, inplace=True)
@@ -78,16 +80,16 @@ all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
 selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
 all_countries = sorted(df_temp['pais'].dropna().unique())
-selected_countries = st.sidebar.multiselect('País', all_countries, default=all_countries)
+selected_countries = st.sidebar.multiselect('País', all_countries)
 
 all_age_groups = sorted(df_temp['age_group'].dropna().unique())
-selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups, default=all_age_groups)
+selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups)
 
 all_genders = sorted(df_temp['Gender'].dropna().unique())
-selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_genders)
+selected_genders = st.sidebar.multiselect('Gênero', all_genders)
 
 all_sels = sorted(df_temp['SEL'].dropna().unique())
-selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
+selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
 
 df_filtered = df_processed.copy()
 if selected_projects:
