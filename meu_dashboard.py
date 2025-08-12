@@ -16,7 +16,6 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         df_quotas = pd.read_csv(initial_quotas_path)
     except FileNotFoundError as e:
         st.error(f"ERRO CRÍTICO: Arquivo não encontrado -> {e}.")
-        st.error(f"Verifique se os caminhos '{final_alloc_path}' e '{initial_quotas_path}' estão corretos.")
         return None, None
 
     if df_alloc.empty or df_quotas.empty:
@@ -57,18 +56,20 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         return " | ".join(parts)
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
+
+    # --- INÍCIO DA CORREÇÃO ---
+    # Garante que a tabela da direita (df_quotas) tenha apenas uma entrada por quota_index
+    # Isso previne que as linhas de df_clean sejam duplicadas no merge.
     df_quotas_unique = df_quotas.drop_duplicates(subset=['quota_index'])
+    
+    # Usa a tabela sem duplicatas para a junção
     df_merged = pd.merge(df_clean, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
+    # --- FIM DA CORREÇÃO ---
     
     return df_merged, df_quotas
 
 st.title("Painel de Controle de Recrutamento")
-
-alloc_file = os.path.join( 'GeminiCheck.csv')
-projects_file = os.path.join('Projects.csv')
-# --- FIM DA CORREÇÃO ---
-
-df_processed, df_projects = load_and_process_data(alloc_file, projects_file)
+df_processed, df_projects = load_and_process_data('GeminiCheck.csv', 'Projects.csv')
 
 if df_processed is None:
     st.stop()
@@ -84,16 +85,16 @@ all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
 selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
 all_countries = sorted(df_temp['pais'].dropna().unique())
-selected_countries = st.sidebar.multiselect('País', all_countries)
+selected_countries = st.sidebar.multiselect('País', all_countries, default=all_countries)
 
 all_age_groups = sorted(df_temp['age_group'].dropna().unique())
-selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups)
+selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups, default=all_age_groups)
 
 all_genders = sorted(df_temp['Gender'].dropna().unique())
-selected_genders = st.sidebar.multiselect('Gênero', all_genders)
+selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_genders)
 
 all_sels = sorted(df_temp['SEL'].dropna().unique())
-selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
+selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
 
 df_filtered = df_processed.copy()
 if selected_projects:
