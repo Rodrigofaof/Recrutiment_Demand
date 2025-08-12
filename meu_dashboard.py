@@ -33,15 +33,8 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
     df_alloc = df_alloc.join(new_cols_df)
     
-    # --- INÍCIO DA CORREÇÃO CONTRA DUPLICATAS ---
-    # Define as colunas que identificam uma alocação única.
-    # Se uma linha tiver a mesma combinação dessas colunas, é uma duplicata.
     colunas_unicas = ['project_id', 'age_group', 'SEL', 'Gender', 'Region']
-    
-    # Antes de qualquer processamento, remove as linhas duplicadas de df_alloc.
-    # A primeira ocorrência ('keep='first'') é mantida.
     df_alloc.drop_duplicates(subset=colunas_unicas, keep='first', inplace=True)
-    # --- FIM DA CORREÇÃO ---
 
     df_alloc['quota_index'] = pd.to_numeric(df_alloc['quota_index'], errors='coerce')
     df_quotas.rename(columns={'index': 'quota_index'}, inplace=True)
@@ -73,7 +66,6 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
     
     return df_merged, df_quotas
 
-# O restante do seu código continua exatamente o mesmo...
 st.title("Painel de Controle de Recrutamento")
 df_processed, df_projects = load_and_process_data('GeminiCheck.csv', 'Projects.csv')
 
@@ -90,19 +82,24 @@ df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if se
 all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
 selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
 
+# --- INÍCIO DA CORREÇÃO ---
+# Os filtros secundários agora começam vazios para evitar conflitos.
 all_countries = sorted(df_temp['pais'].dropna().unique())
-selected_countries = st.sidebar.multiselect('País', all_countries, default=all_countries)
+selected_countries = st.sidebar.multiselect('País', all_countries)
 
 all_age_groups = sorted(df_temp['age_group'].dropna().unique())
-selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups, default=all_age_groups)
+selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups)
 
 all_genders = sorted(df_temp['Gender'].dropna().unique())
-selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_genders)
+selected_genders = st.sidebar.multiselect('Gênero', all_genders)
 
 all_sels = sorted(df_temp['SEL'].dropna().unique())
-selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
+selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
+# --- FIM DA CORREÇÃO ---
+
 
 df_filtered = df_processed.copy()
+# A lógica de aplicação dos filtros agora funciona corretamente, pois só aplica os filtros que o usuário de fato selecionou.
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 if selected_labels:
@@ -116,6 +113,7 @@ if selected_genders:
 if selected_sels:
     df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
+# O restante do seu código para as abas continua o mesmo...
 tab1, tab2, tab3 = st.tabs(["Dashboard Geral", "Fluxo Sankey", "Tabelas"])
 
 with tab1:
