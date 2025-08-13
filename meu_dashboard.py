@@ -56,15 +56,8 @@ def load_and_process_data(final_alloc_path, initial_quotas_path):
         return " | ".join(parts)
 
     df_quotas['QuotaLabel'] = df_quotas.apply(create_quota_label, axis=1)
-
-    # --- INÍCIO DA CORREÇÃO ---
-    # Garante que a tabela da direita (df_quotas) tenha apenas uma entrada por quota_index
-    # Isso previne que as linhas de df_clean sejam duplicadas no merge.
     df_quotas_unique = df_quotas.drop_duplicates(subset=['quota_index'])
-    
-    # Usa a tabela sem duplicatas para a junção
     df_merged = pd.merge(df_clean, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
-    # --- FIM DA CORREÇÃO ---
     
     return df_merged, df_quotas
 
@@ -96,8 +89,7 @@ selected_genders = st.sidebar.multiselect('Gênero', all_genders, default=all_ge
 all_sels = sorted(df_temp['SEL'].dropna().unique())
 selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels, default=all_sels)
 
-df_filtered = df_processed
-
+df_filtered = df_processed.copy()
 if selected_projects:
     df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
 if selected_labels:
