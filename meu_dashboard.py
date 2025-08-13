@@ -59,23 +59,47 @@ if df_alloc_processed is not None:
     df_filtered = df_alloc_processed.copy()
     df_projects_filtered = df_projects.copy()
 
+    # 1. Filtro de Projeto
     all_projects = sorted(df_alloc_processed['project_id'].unique())
-    selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
+    selected_projects = st.sidebar.multiselect('1. Projeto(s)', all_projects)
     
     if selected_projects:
         df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
         df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
 
-    all_countries = sorted(df_filtered['pais'].unique())
-    selected_countries = st.sidebar.multiselect('2. Selecione o(s) País(es)', all_countries)
+    # 2. Filtro de País
+    all_countries = sorted(df_filtered['pais'].dropna().unique())
+    selected_countries = st.sidebar.multiselect('2. País(es)', all_countries)
     
     if selected_countries:
         df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
-        
         if 'pais' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['pais'].isin(selected_countries)]
         elif 'country' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
+    
+    # --- INÍCIO DAS ADIÇÕES ---
+    # 3. Filtro de Região
+    all_regions = sorted(df_filtered['Region'].dropna().unique())
+    selected_regions = st.sidebar.multiselect('3. Região(ões)', all_regions)
+
+    if selected_regions:
+        df_filtered = df_filtered[df_filtered['Region'].isin(selected_regions)]
+
+    # 4. Filtro de Faixa Etária
+    all_age_groups = sorted(df_filtered['age_group'].dropna().unique())
+    selected_age_groups = st.sidebar.multiselect('4. Faixa Etária', all_age_groups)
+
+    if selected_age_groups:
+        df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
+
+    # 5. Filtro de Gênero
+    all_genders = sorted(df_filtered['Gender'].dropna().unique())
+    selected_genders = st.sidebar.multiselect('5. Gênero', all_genders)
+
+    if selected_genders:
+        df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
+    # --- FIM DAS ADIÇÕES ---
 
 # --- ETAPA 5: Criar as abas do dashboard ---
 if df_alloc_processed is not None and df_projects is not None:
@@ -87,22 +111,13 @@ if df_alloc_processed is not None and df_projects is not None:
         if df_filtered.empty:
             st.warning("Nenhum dado encontrado para a combinação de filtros selecionada.")
         else:
-            # --- INÍCIO DA ADIÇÃO DOS CARDS ---
             st.markdown("---")
-            
-            # Calcula os totais a partir da tabela já filtrada
             total_recrutar = df_filtered['Pessoas_Para_Recrutar'].sum()
             total_alocados = df_filtered['allocated_completes'].sum()
-
-            # Cria duas colunas para os cards
             kpi1, kpi2 = st.columns(2)
-            
-            # Exibe os cards com os totais
             kpi1.metric(label="Painelistas Necessários", value=f"{total_recrutar:,}")
             kpi2.metric(label="Completes Necessários (Alocados)", value=f"{total_alocados:,}")
-            
             st.markdown("---")
-            # --- FIM DA ADIÇÃO DOS CARDS ---
             
             required_cols = ['Pessoas_Para_Recrutar', 'age_group', 'Gender', 'pais', 'SEL']
             if not all(col in df_filtered.columns for col in required_cols):
