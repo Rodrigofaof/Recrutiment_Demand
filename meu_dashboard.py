@@ -39,6 +39,9 @@ def load_and_process_data(alloc_path, projects_path):
     df_alloc_processed = df_alloc.join(new_cols_df)
     df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
     
+    df_alloc_processed['project_id'] = df_alloc_processed['project_id'].astype(str)
+    df_projects['project_id'] = df_projects['project_id'].astype(str)
+
     return df_alloc_processed, df_projects
 
 # --- ETAPA 3: Carregar os dados ---
@@ -48,44 +51,49 @@ df_alloc_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FIL
 if df_alloc_processed is not None:
     st.sidebar.header("Filtros")
     
-    # Adiciona o filtro de project_id
     all_projects = sorted(df_alloc_processed['project_id'].unique())
-    selected_projects = st.sidebar.multiselect('Selecione o(s) Projeto(s)', all_projects)
+    selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
+    
+    # DataFrame temporário para popular o filtro de país
+    df_temp = df_alloc_processed[df_alloc_processed['project_id'].isin(selected_projects)] if selected_projects else df_alloc_processed
+    
+    all_countries = sorted(df_temp['pais'].unique())
+    selected_countries = st.sidebar.multiselect('2. Selecione o(s) País(es)', all_countries)
 
-    # Cria o DataFrame filtrado
+    # Cria os DataFrames filtrados
+    df_filtered = df_alloc_processed.copy()
+    df_projects_filtered = df_projects.copy()
+    
     if selected_projects:
-        df_filtered = df_alloc_processed[df_alloc_processed['project_id'].isin(selected_projects)]
-        df_projects_filtered = df_projects[df_projects['project_id'].isin(selected_projects)]
-    else:
-        # Se nenhum projeto for selecionado, usa os dados completos
-        df_filtered = df_alloc_processed
-        df_projects_filtered = df_projects
+        df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
+        df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
+    
+    if selected_countries:
+        df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
+        # O filtro de país na tabela de projetos é um pouco mais complexo,
+        # pois a coluna pode ter outro nome. Assumindo 'country' ou 'pais'.
+        if 'pais' in df_projects_filtered.columns:
+            df_projects_filtered = df_projects_filtered[df_projects_filtered['pais'].isin(selected_countries)]
+        elif 'country' in df_projects_filtered.columns:
+            df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
-# --- ETAPA 5: Criar as abas do dashboard ---
+
+# --- ETAPA 5: Criar as abas do dashboard (ORDEM ALTERADA) ---
 if df_alloc_processed is not None and df_projects is not None:
-    tab_tabelas, tab_graficos = st.tabs(["Tabelas de Dados", "Gráficos de Cotas"])
-
-    with tab_tabelas:
-        st.header("Dados de Alocação (`GeminiCheck.csv`)")
-        st.dataframe(df_filtered)
-        st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
-
-        st.header("Dados das Cotas Iniciais (`Projects.csv`)")
-        st.dataframe(df_projects_filtered)
-        st.info(f"Mostrando {len(df_projects_filtered)} de {len(df_projects)} linhas.")
+    tab_graficos, tab_tabelas = st.tabs(["Gráficos de Cotas", "Tabelas de Dados"])
 
     with tab_graficos:
         st.header("Visão Gráfica da Demanda por Recrutamento")
         
         if df_filtered.empty:
-            st.warning("Nenhum dado encontrado para o(s) projeto(s) selecionado(s).")
+            st.warning("Nenhum dado encontrado para a combinação de filtros selecionada.")
         else:
             required_cols = ['Pessoas_Para_Recrutar', 'age_group', 'Gender', 'pais', 'SEL']
             if not all(col in df_filtered.columns for col in required_cols):
                 st.warning("Não foi possível gerar os gráficos. Colunas necessárias não encontradas.")
             else:
                 custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
-                        
+                
                 col1, col2 = st.columns(2)
                 with col1:
                     by_age = df_filtered.groupby('age_group')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
@@ -107,3 +115,12 @@ if df_alloc_processed is not None and df_projects is not None:
                     by_sel = df_filtered.groupby('SEL')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
                     fig_sel = px.bar(by_sel, x='SEL', y='Pessoas_Para_Recrutar', title='Demanda por Classe Social (SEL)', color_discrete_sequence=custom_colors)
                     st.plotly_chart(fig_sel, use_container_width=True)
+
+    with tab_tabelas:
+        st.header("Dados de Alocação (`GeminiCheck.csv`)")
+        st.dataframe(df_filtered)
+        st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
+
+        st.header("Dados das Cotas Iniciais (`Projects.csv`)")
+        st.dataframe(df_projects_filtered)
+        st.info(f"Mostrando {len(df_projects_filtered)} de {len(df_projects)} linhas.")
