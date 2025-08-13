@@ -4,7 +4,7 @@ import os
 import plotly.express as px
 import ast
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 st.title("Painel de Controle de Recrutamento")
 
@@ -12,7 +12,7 @@ st.title("Painel de Controle de Recrutamento")
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
-# --- ETAPA 2: Função para carregar e processar os dados (VERSÃO CORRIGIDA) ---
+# --- ETAPA 2: Função para carregar e processar os dados ---
 @st.cache_data
 def load_and_process_data(alloc_path, projects_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
@@ -32,8 +32,6 @@ def load_and_process_data(alloc_path, projects_path):
         except (ValueError, SyntaxError):
             return None
 
-    # --- INÍCIO DA LÓGICA CORRIGIDA ---
-    # Processa cada linha para extrair os dados de cota de forma dinâmica e correta
     parsed_data = []
     for index, row in df_alloc.iterrows():
         keys = safe_eval(row['cotas'])
@@ -44,44 +42,92 @@ def load_and_process_data(alloc_path, projects_path):
             row_dict = dict(zip(keys, values))
         parsed_data.append(row_dict)
 
-    # Cria um novo DataFrame com os dados demográficos devidamente mapeados
     new_cols_df = pd.DataFrame(parsed_data, index=df_alloc.index)
-
-    # Junta o DataFrame original com as novas colunas demográficas corretas
     df_alloc_processed = pd.concat([df_alloc, new_cols_df], axis=1)
-    # --- FIM DA LÓGICA CORRIGIDA ---
 
     df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
     
-    return df_alloc_processed, df_projects
+    # Adiciona o QuotaLabel para o filtro
+    df_projects.rename(columns={'index': 'quota_index'}, inplace=True)
+    df_alloc_processed['quota_index'] = pd.to_numeric(df_alloc_processed['quota_index'], errors='coerce')
+    df_alloc_processed.dropna(subset=['quota_index'], inplace=True)
+    df_alloc_processed['quota_index'] = df_alloc_processed['quota_index'].astype(int)
+
+    def create_quota_label(row):
+        parts = [f"Q:{row['quota_index']}"]
+        if '1' in row and str(row.get('1', '0')) != '0': parts.append(f"Idade:{row['1']}")
+        if '2' in row and str(row.get('2', '0')) != '0': parts.append(f"Gênero:{row['2']}")
+        return " | ".join(parts)
+
+    df_projects['QuotaLabel'] = df_projects.apply(create_quota_label, axis=1)
+    df_quotas_unique = df_projects.drop_duplicates(subset=['quota_index'])
+    
+    df_merged = pd.merge(df_alloc_processed, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
+    
+    return df_merged, df_projects
 
 # --- ETAPA 3: Carregar os dados ---
-df_alloc_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
+df_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
 
-# --- ETAPA 4: Criar as abas do dashboard ---
-if df_alloc_processed is not None and df_projects is not None:
+# --- ETAPA 4: Filtros na barra lateral ---
+if df_processed is not None:
+    st.sidebar.header("Filtros")
+    
+    all_projects = sorted(df_processed['project_id'].unique())
+    selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
+
+    df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if selected_projects else df_processed
+
+    all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
+    selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
+    
+    all_countries = sorted(df_temp['pais'].dropna().unique())
+    selected_countries = st.sidebar.multiselect('País', all_countries)
+
+    all_age_groups = sorted(df_temp['age_group'].dropna().unique())
+    selected_age_groups = st.sidebar.multiselect('Faixa Etária', all_age_groups)
+
+    all_genders = sorted(df_temp['Gender'].dropna().unique())
+    selected_genders = st.sidebar.multiselect('Gênero', all_genders)
+
+    all_sels = sorted(df_temp['SEL'].dropna().unique())
+    selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
+
+    # Aplicação dos filtros
+    df_filtered = df_processed.copy()
+    if selected_projects:
+        df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
+    if selected_labels:
+        df_filtered = df_filtered[df_filtered['QuotaLabel'].isin(selected_labels)]
+    if selected_countries:
+        df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
+    if selected_age_groups:
+        df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
+    if selected_genders:
+        df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
+    if selected_sels:
+        df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
+
+# --- ETAPA 5: Criar as abas do dashboard ---
+if df_processed is not None and df_projects is not None:
     tab_tabelas, tab_graficos = st.tabs(["Tabelas de Dados", "Gráficos de Cotas"])
 
     with tab_tabelas:
         st.header("Dados de Alocação Processados (`GeminiCheck.csv`)")
-        st.dataframe(df_alloc_processed)
-        st.info(f"Carregadas {len(df_alloc_processed)} linhas.")
+        st.dataframe(df_filtered)
 
         st.header("Dados das Cotas Iniciais (`Projects.csv`)")
-        st.dataframe(df_projects)
-        st.info(f"Carregadas {len(df_projects)} linhas.")
+        st.dataframe(df_projects[df_projects['quota_index'].isin(df_filtered['quota_index'].unique())])
 
     with tab_graficos:
         st.header("Visão Gráfica da Demanda por Recrutamento")
         
-        required_cols = ['Pessoas_Para_Recrutar', 'age_group', 'Gender', 'pais', 'SEL']
-        if not all(col in df_alloc_processed.columns for col in required_cols):
-            st.warning("Não foi possível gerar os gráficos. Colunas necessárias não encontradas.")
+        if df_filtered.empty:
+            st.warning("Nenhum dado encontrado para os filtros selecionados.")
         else:
             custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
             
-            # Limpa os dados para os gráficos
-            df_graficos = df_alloc_processed.copy()
+            df_graficos = df_filtered.copy()
             for col in ['Gender', 'SEL', 'age_group', 'pais']:
                 if col in df_graficos.columns:
                     df_graficos[col] = df_graficos[col].replace(['0', 0, 'No_Age_Group'], None)
