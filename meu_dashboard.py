@@ -47,38 +47,39 @@ def load_and_process_data(alloc_path, projects_path):
 # --- ETAPA 3: Carregar os dados ---
 df_alloc_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
 
-# --- ETAPA 4: Filtros na barra lateral ---
+# --- ETAPA 4: Filtros na barra lateral (LÓGICA CORRIGIDA) ---
 if df_alloc_processed is not None:
     st.sidebar.header("Filtros")
     
+    # DataFrame que será modificado pelos filtros
+    df_filtered = df_alloc_processed.copy()
+    df_projects_filtered = df_projects.copy()
+
+    # 1. Filtro de Projeto
     all_projects = sorted(df_alloc_processed['project_id'].unique())
     selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
     
-    # DataFrame temporário para popular o filtro de país
-    df_temp = df_alloc_processed[df_alloc_processed['project_id'].isin(selected_projects)] if selected_projects else df_alloc_processed
-    
-    all_countries = sorted(df_temp['pais'].unique())
-    selected_countries = st.sidebar.multiselect('2. Selecione o(s) País(es)', all_countries)
-
-    # Cria os DataFrames filtrados
-    df_filtered = df_alloc_processed.copy()
-    df_projects_filtered = df_projects.copy()
-    
+    # Aplica o filtro de projeto imediatamente
     if selected_projects:
         df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
         df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
+
+    # 2. Filtro de País (as opções agora dependem do filtro de projeto)
+    all_countries = sorted(df_filtered['pais'].unique())
+    selected_countries = st.sidebar.multiselect('2. Selecione o(s) País(es)', all_countries)
     
+    # Aplica o filtro de país sobre o resultado já filtrado
     if selected_countries:
         df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
-        # O filtro de país na tabela de projetos é um pouco mais complexo,
-        # pois a coluna pode ter outro nome. Assumindo 'country' ou 'pais'.
+        
+        # Filtra a tabela de projetos também
         if 'pais' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['pais'].isin(selected_countries)]
         elif 'country' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
 
-# --- ETAPA 5: Criar as abas do dashboard (ORDEM ALTERADA) ---
+# --- ETAPA 5: Criar as abas do dashboard ---
 if df_alloc_processed is not None and df_projects is not None:
     tab_graficos, tab_tabelas = st.tabs(["Gráficos de Cotas", "Tabelas de Dados"])
 
