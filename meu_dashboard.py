@@ -29,7 +29,7 @@ def load_and_process_data(alloc_path, projects_path):
     df_projects_raw = pd.read_csv(projects_path)
 
     # 2.2: Validação das Colunas Essenciais
-    required_alloc_cols = ['quota_index', 'project_id', 'country', 'cotas', 'resultado_cota', 'Pessoas_Para_Recrututar', 'allocated_completes']
+    required_alloc_cols = ['quota_index', 'project_id', 'country', 'cotas', 'resultado_cota', 'Pessoas_Para_Recrutar', 'allocated_completes']
     if not all(col in df_alloc_raw.columns for col in required_alloc_cols):
         st.error(f"ERRO CRÍTICO: O arquivo 'GeminiCheck.csv' não contém todas as colunas necessárias. Estão faltando: {set(required_alloc_cols) - set(df_alloc_raw.columns)}")
         return None, None
