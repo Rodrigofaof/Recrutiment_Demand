@@ -12,11 +12,12 @@ st.title("Painel de Controle de Recrutamento")
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
-# --- ETAPA 2: Função para carregar e processar os dados ---
+# --- ETAPA 2: Função para carregar e processar os dados (VERSÃO ROBUSTA) ---
 @st.cache_data
 def load_and_process_data(alloc_path, projects_path):
+    # Tenta carregar os arquivos CSV, com mensagens de erro claras se falhar
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
-        st.error(f"ERRO: Um ou ambos os arquivos não foram encontrados. Verifique 'GeminiCheck.csv' e 'Projects.csv'.")
+        st.error(f"ERRO: Um ou ambos os arquivos não foram encontrados. Verifique a localização de 'GeminiCheck.csv' e 'Projects.csv'.")
         return None, None
     
     df_alloc = pd.read_csv(alloc_path)
@@ -32,6 +33,7 @@ def load_and_process_data(alloc_path, projects_path):
         except (ValueError, SyntaxError):
             return None
 
+    # Processa cada linha para extrair os dados de cota de forma dinâmica e correta
     parsed_data = []
     for index, row in df_alloc.iterrows():
         keys = safe_eval(row['cotas'])
@@ -44,19 +46,22 @@ def load_and_process_data(alloc_path, projects_path):
 
     new_cols_df = pd.DataFrame(parsed_data, index=df_alloc.index)
     df_alloc_processed = pd.concat([df_alloc, new_cols_df], axis=1)
-
     df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
     
-    # Adiciona o QuotaLabel para o filtro
+    # Une com os dados de projetos para criar o QuotaLabel
     df_projects.rename(columns={'index': 'quota_index'}, inplace=True)
     df_alloc_processed['quota_index'] = pd.to_numeric(df_alloc_processed['quota_index'], errors='coerce')
     df_alloc_processed.dropna(subset=['quota_index'], inplace=True)
     df_alloc_processed['quota_index'] = df_alloc_processed['quota_index'].astype(int)
 
+    # Função segura para criar o rótulo da cota
     def create_quota_label(row):
         parts = [f"Q:{row['quota_index']}"]
-        if '1' in row and str(row.get('1', '0')) != '0': parts.append(f"Idade:{row['1']}")
-        if '2' in row and str(row.get('2', '0')) != '0': parts.append(f"Gênero:{row['2']}")
+        # Verifica se as colunas existem antes de usá-las
+        if '1' in row and pd.notna(row['1']) and str(row['1']) != '0': 
+            parts.append(f"Idade:{row['1']}")
+        if '2' in row and pd.notna(row['2']) and str(row['2']) != '0': 
+            parts.append(f"Gênero:{row['2']}")
         return " | ".join(parts)
 
     df_projects['QuotaLabel'] = df_projects.apply(create_quota_label, axis=1)
@@ -69,15 +74,17 @@ def load_and_process_data(alloc_path, projects_path):
 # --- ETAPA 3: Carregar os dados ---
 df_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
 
-# --- ETAPA 4: Filtros na barra lateral ---
+# --- ETAPA 4: Filtros na barra lateral (LÓGICA CORRIGIDA) ---
 if df_processed is not None:
     st.sidebar.header("Filtros")
     
     all_projects = sorted(df_processed['project_id'].unique())
     selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
 
+    # DataFrame temporário com base na seleção de projetos para popular outros filtros
     df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if selected_projects else df_processed
 
+    # Filtros secundários SEM seleção padrão para evitar conflitos
     all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
     selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
     
@@ -93,7 +100,7 @@ if df_processed is not None:
     all_sels = sorted(df_temp['SEL'].dropna().unique())
     selected_sels = st.sidebar.multiselect('Classe Social (SEL)', all_sels)
 
-    # Aplicação dos filtros
+    # Aplicação dos filtros que foram de fato selecionados pelo usuário
     df_filtered = df_processed.copy()
     if selected_projects:
         df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
@@ -117,13 +124,16 @@ if df_processed is not None and df_projects is not None:
         st.dataframe(df_filtered)
 
         st.header("Dados das Cotas Iniciais (`Projects.csv`)")
-        st.dataframe(df_projects[df_projects['quota_index'].isin(df_filtered['quota_index'].unique())])
+        if not df_filtered.empty:
+            st.dataframe(df_projects[df_projects['quota_index'].isin(df_filtered['quota_index'].unique())])
+        else:
+            st.dataframe(df_projects)
 
     with tab_graficos:
         st.header("Visão Gráfica da Demanda por Recrutamento")
         
         if df_filtered.empty:
-            st.warning("Nenhum dado encontrado para os filtros selecionados.")
+            st.warning("Nenhum dado encontrado para os filtros selecionados. Selecione um projeto para começar.")
         else:
             custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
             
