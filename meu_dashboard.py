@@ -44,6 +44,16 @@ def load_and_process_data(alloc_path, projects_path):
     df_alloc_processed = pd.concat([df_alloc, dynamic_df], axis=1)
     df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
     
+    # --- INÍCIO DAS NOVAS SUBSTITUIÇÕES ---
+    # Substitui os valores '0' por textos descritivos
+    if 'Region' in df_alloc_processed.columns:
+        # Usamos .astype(str) para garantir que a comparação com '0' funcione
+        df_alloc_processed['Region'] = df_alloc_processed['Region'].astype(str).replace('0', 'Qualquer Região')
+    
+    if 'SEL' in df_alloc_processed.columns:
+        df_alloc_processed['SEL'] = df_alloc_processed['SEL'].astype(str).replace('0', 'País sem SEL')
+    # --- FIM DAS NOVAS SUBSTITUIÇÕES ---
+    
     df_alloc_processed['project_id'] = df_alloc_processed['project_id'].astype(str)
     df_projects['project_id'] = df_projects['project_id'].astype(str)
 
@@ -59,7 +69,6 @@ if df_alloc_processed is not None:
     df_filtered = df_alloc_processed.copy()
     df_projects_filtered = df_projects.copy()
 
-    # 1. Filtro de Projeto
     all_projects = sorted(df_alloc_processed['project_id'].unique())
     selected_projects = st.sidebar.multiselect('1. Projeto(s)', all_projects)
     
@@ -67,7 +76,6 @@ if df_alloc_processed is not None:
         df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
         df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
 
-    # 2. Filtro de País
     all_countries = sorted(df_filtered['pais'].dropna().unique())
     selected_countries = st.sidebar.multiselect('2. País(es)', all_countries)
     
@@ -78,80 +86,4 @@ if df_alloc_processed is not None:
         elif 'country' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
     
-    # --- INÍCIO DAS ADIÇÕES ---
-    # 3. Filtro de Região
-    all_regions = sorted(df_filtered['Region'].dropna().unique())
-    selected_regions = st.sidebar.multiselect('3. Região(ões)', all_regions)
-
-    if selected_regions:
-        df_filtered = df_filtered[df_filtered['Region'].isin(selected_regions)]
-
-    # 4. Filtro de Faixa Etária
-    all_age_groups = sorted(df_filtered['age_group'].dropna().unique())
-    selected_age_groups = st.sidebar.multiselect('4. Faixa Etária', all_age_groups)
-
-    if selected_age_groups:
-        df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
-
-    # 5. Filtro de Gênero
-    all_genders = sorted(df_filtered['Gender'].dropna().unique())
-    selected_genders = st.sidebar.multiselect('5. Gênero', all_genders)
-
-    if selected_genders:
-        df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
-    # --- FIM DAS ADIÇÕES ---
-
-# --- ETAPA 5: Criar as abas do dashboard ---
-if df_alloc_processed is not None and df_projects is not None:
-    tab_graficos, tab_tabelas = st.tabs(["Gráficos de Cotas", "Tabelas de Dados"])
-
-    with tab_graficos:
-        st.header("Visão Gráfica da Demanda por Recrutamento")
-        
-        if df_filtered.empty:
-            st.warning("Nenhum dado encontrado para a combinação de filtros selecionada.")
-        else:
-            st.markdown("---")
-            total_recrutar = df_filtered['Pessoas_Para_Recrutar'].sum()
-            total_alocados = df_filtered['allocated_completes'].sum()
-            kpi1, kpi2 = st.columns(2)
-            kpi1.metric(label="Painelistas Necessários", value=f"{total_recrutar:,}")
-            kpi2.metric(label="Completes Necessários (Alocados)", value=f"{total_alocados:,}")
-            st.markdown("---")
-            
-            required_cols = ['Pessoas_Para_Recrutar', 'age_group', 'Gender', 'pais', 'SEL']
-            if not all(col in df_filtered.columns for col in required_cols):
-                st.warning("Não foi possível gerar os gráficos. Colunas necessárias não encontradas.")
-            else:
-                custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    by_age = df_filtered.groupby('age_group')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
-                    fig_age = px.bar(by_age, x='age_group', y='Pessoas_Para_Recrutar', title='Demanda por Faixa Etária', color_discrete_sequence=custom_colors)
-                    st.plotly_chart(fig_age, use_container_width=True)
-                
-                with col2:
-                    by_gender = df_filtered.groupby('Gender')['Pessoas_Para_Recrutar'].sum().reset_index()
-                    fig_gender = px.pie(by_gender, names='Gender', values='Pessoas_Para_Recrutar', title='Demanda por Gênero', hole=0.3, color_discrete_sequence=custom_colors)
-                    st.plotly_chart(fig_gender, use_container_width=True)
-
-                col3, col4 = st.columns(2)
-                with col3:
-                    by_country = df_filtered.groupby('pais')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
-                    fig_country = px.bar(by_country, x='pais', y='Pessoas_Para_Recrutar', title='Demanda por País', color_discrete_sequence=custom_colors)
-                    st.plotly_chart(fig_country, use_container_width=True)
-                    
-                with col4:
-                    by_sel = df_filtered.groupby('SEL')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
-                    fig_sel = px.bar(by_sel, x='SEL', y='Pessoas_Para_Recrutar', title='Demanda por Classe Social (SEL)', color_discrete_sequence=custom_colors)
-                    st.plotly_chart(fig_sel, use_container_width=True)
-
-    with tab_tabelas:
-        st.header("Dados de Alocação (`GeminiCheck.csv`)")
-        st.dataframe(df_filtered)
-        st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
-
-        st.header("Dados das Cotas Iniciais (`Projects.csv`)")
-        st.dataframe(df_projects_filtered)
-        st.info(f"Mostrando {len(df_projects_filtered)} de {len(df_projects)} linhas.")
+    all_regions = sorted(df_filtered['Region'].dropna().
