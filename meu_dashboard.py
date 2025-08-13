@@ -44,7 +44,6 @@ def load_and_process_data(alloc_path, projects_path):
     df_alloc_processed = pd.concat([df_alloc, dynamic_df], axis=1)
     df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
     
-    # Garante que 'project_id' seja do tipo string em AMBAS as tabelas
     df_alloc_processed['project_id'] = df_alloc_processed['project_id'].astype(str)
     df_projects['project_id'] = df_projects['project_id'].astype(str)
 
@@ -88,6 +87,23 @@ if df_alloc_processed is not None and df_projects is not None:
         if df_filtered.empty:
             st.warning("Nenhum dado encontrado para a combinação de filtros selecionada.")
         else:
+            # --- INÍCIO DA ADIÇÃO DOS CARDS ---
+            st.markdown("---")
+            
+            # Calcula os totais a partir da tabela já filtrada
+            total_recrutar = df_filtered['Pessoas_Para_Recrutar'].sum()
+            total_alocados = df_filtered['allocated_completes'].sum()
+
+            # Cria duas colunas para os cards
+            kpi1, kpi2 = st.columns(2)
+            
+            # Exibe os cards com os totais
+            kpi1.metric(label="Painelistas Necessários", value=f"{total_recrutar:,}")
+            kpi2.metric(label="Completes Necessários (Alocados)", value=f"{total_alocados:,}")
+            
+            st.markdown("---")
+            # --- FIM DA ADIÇÃO DOS CARDS ---
+            
             required_cols = ['Pessoas_Para_Recrutar', 'age_group', 'Gender', 'pais', 'SEL']
             if not all(col in df_filtered.columns for col in required_cols):
                 st.warning("Não foi possível gerar os gráficos. Colunas necessárias não encontradas.")
