@@ -9,9 +9,8 @@ st.title("Verificador de Carga de Dados")
 st.write("Este painel serve para carregar e exibir as tabelas brutas, garantindo que os arquivos estão acessíveis e sendo lidos corretamente.")
 
 # --- ETAPA 1: Definir os caminhos completos para os arquivos ---
-DATA_PATH = "/home/offerwise/Recrutiment_Demand/"
-ALLOC_FILE = os.path.join(DATA_PATH, 'GeminiCheck.csv')
-PROJECTS_FILE = os.path.join(DATA_PATH, 'Projects.csv')
+ALLOC_FILE = os.path.join('GeminiCheck.csv')
+PROJECTS_FILE = os.path.join('Projects.csv')
 
 
 # --- ETAPA 2: Função para carregar os dados ---
