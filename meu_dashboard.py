@@ -1,53 +1,90 @@
 import streamlit as st
 import pandas as pd
 import os
+import plotly.express as px
 
-# --- Configuração da Página ---
 st.set_page_config(layout="wide")
 
-st.title("Verificador de Carga de Dados")
-st.write("Este painel serve para carregar e exibir as tabelas brutas, garantindo que os arquivos estão acessíveis e sendo lidos corretamente.")
+st.title("Painel de Controle de Recrutamento")
 
-# --- ETAPA 1: Definir os caminhos completos para os arquivos ---
-ALLOC_FILE = os.path.join('GeminiCheck.csv')
-PROJECTS_FILE = os.path.join('Projects.csv')
+# --- ETAPA 1: Definir os caminhos dos arquivos ---
+ALLOC_FILE = 'GeminiCheck.csv'
+PROJECTS_FILE = 'Projects.csv'
 
-
-# --- ETAPA 2: Função para carregar os dados ---
+# --- ETAPA 2: Função para carregar e processar os dados ---
 @st.cache_data
-def load_data(file_path):
-    """
-    Lê um arquivo CSV e o retorna como um DataFrame do pandas.
-    Retorna None se o arquivo não for encontrado ou ocorrer um erro.
-    """
-    if not os.path.exists(file_path):
-        st.error(f"ARQUIVO NÃO ENCONTRADO: O arquivo não foi localizado no caminho esperado -> {file_path}")
-        return None
-    try:
-        df = pd.read_csv(file_path)
-        return df
-    except Exception as e:
-        st.error(f"FALHA AO LER ARQUIVO: Ocorreu um erro ao tentar ler o arquivo {file_path}. Detalhes: {e}")
-        return None
+def load_and_process_data(alloc_path, projects_path):
+    if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
+        st.error(f"ERRO: Um ou ambos os arquivos não foram encontrados. Verifique 'GeminiCheck.csv' e 'Projects.csv'.")
+        return None, None
+    
+    df_alloc = pd.read_csv(alloc_path)
+    df_projects = pd.read_csv(projects_path)
 
-# --- ETAPA 3: Carregar os dados e exibi-los em abas ---
-df_alloc = load_data(ALLOC_FILE)
-df_projects = load_data(PROJECTS_FILE)
+    if 'resultado_cota' not in df_alloc.columns:
+        st.error("ERRO: A coluna 'resultado_cota' não foi encontrada em GeminiCheck.csv, necessária para os gráficos.")
+        return df_alloc, df_projects
+        
+    def extract_quota_data(row):
+        try:
+            items = [item.strip() for item in str(row).strip("()").replace("'", "").split(',')]
+            while len(items) < 4: items.append(None)
+            return items
+        except Exception: 
+            return [None, None, None, None]
 
-tab1, tab2 = st.tabs(["Dados de Alocação (GeminiCheck.csv)", "Dados de Cotas (Projects.csv)"])
+    split_data = df_alloc['resultado_cota'].apply(extract_quota_data).to_list()
+    new_cols_df = pd.DataFrame(split_data, index=df_alloc.index, columns=['age_group', 'SEL', 'Gender', 'Region'])
+    
+    df_alloc_processed = df_alloc.join(new_cols_df)
+    df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
+    
+    return df_alloc_processed, df_projects
 
-with tab1:
-    st.header("Conteúdo de `GeminiCheck.csv`")
-    if df_alloc is not None:
-        st.dataframe(df_alloc)
-        st.success(f"Arquivo carregado com sucesso. Total de {len(df_alloc)} linhas.")
-    else:
-        st.warning("Não foi possível carregar o arquivo de dados de alocação.")
+# --- ETAPA 3: Carregar os dados ---
+df_alloc_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
 
-with tab2:
-    st.header("Conteúdo de `Projects.csv`")
-    if df_projects is not None:
+# --- ETAPA 4: Criar as abas do dashboard ---
+if df_alloc_processed is not None and df_projects is not None:
+    tab_tabelas, tab_graficos = st.tabs(["Tabelas de Dados", "Gráficos de Cotas"])
+
+    with tab_tabelas:
+        st.header("Dados de Alocação (`GeminiCheck.csv`)")
+        st.dataframe(df_alloc_processed)
+        st.info(f"Carregadas {len(df_alloc_processed)} linhas.")
+
+        st.header("Dados das Cotas Iniciais (`Projects.csv`)")
         st.dataframe(df_projects)
-        st.success(f"Arquivo carregado com sucesso. Total de {len(df_projects)} linhas.")
-    else:
-        st.warning("Não foi possível carregar o arquivo de dados dos projetos.")
+        st.info(f"Carregadas {len(df_projects)} linhas.")
+
+    with tab_graficos:
+        st.header("Visão Gráfica da Demanda por Recrutamento")
+        
+        # Define as colunas necessárias para os gráficos
+        required_cols = ['Pessoas_Para_Recrutar', 'age_group', 'Gender', 'pais', 'SEL']
+        if not all(col in df_alloc_processed.columns for col in required_cols):
+            st.warning("Não foi possível gerar os gráficos. Colunas necessárias (ex: 'Pessoas_Para_Recrutar') não encontradas.")
+        else:
+            custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                by_age = df_alloc_processed.groupby('age_group')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+                fig_age = px.bar(by_age, x='age_group', y='Pessoas_Para_Recrutar', title='Demanda por Faixa Etária', color_discrete_sequence=custom_colors)
+                st.plotly_chart(fig_age, use_container_width=True)
+            
+            with col2:
+                by_gender = df_alloc_processed.groupby('Gender')['Pessoas_Para_Recrutar'].sum().reset_index()
+                fig_gender = px.pie(by_gender, names='Gender', values='Pessoas_Para_Recrutar', title='Demanda por Gênero', hole=0.3, color_discrete_sequence=custom_colors)
+                st.plotly_chart(fig_gender, use_container_width=True)
+
+            col3, col4 = st.columns(2)
+            with col3:
+                by_country = df_alloc_processed.groupby('pais')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+                fig_country = px.bar(by_country, x='pais', y='Pessoas_Para_Recrutar', title='Demanda por País', color_discrete_sequence=custom_colors)
+                st.plotly_chart(fig_country, use_container_width=True)
+                
+            with col4:
+                by_sel = df_alloc_processed.groupby('SEL')['Pessoas_Para_Recrutar'].sum().sort_values(ascending=False).reset_index()
+                fig_sel = px.bar(by_sel, x='SEL', y='Pessoas_Para_Recrutar', title='Demanda por Classe Social (SEL)', color_discrete_sequence=custom_colors)
+                st.plotly_chart(fig_sel, use_container_width=True)
