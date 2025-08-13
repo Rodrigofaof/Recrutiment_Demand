@@ -29,7 +29,8 @@ def load_and_process_data(alloc_path, projects_path):
         
     def safe_eval(val):
         try:
-            return ast.literal_eval(val)
+            # Converte para string para garantir que ast.literal_eval não falhe
+            return ast.literal_eval(str(val))
         except (ValueError, SyntaxError):
             return None
 
@@ -74,7 +75,7 @@ def load_and_process_data(alloc_path, projects_path):
 # --- ETAPA 3: Carregar os dados ---
 df_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
 
-# --- ETAPA 4: Filtros na barra lateral (LÓGICA CORRIGIDA) ---
+# --- ETAPA 4: Filtros na barra lateral ---
 if df_processed is not None:
     st.sidebar.header("Filtros")
     
