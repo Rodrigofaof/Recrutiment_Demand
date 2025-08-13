@@ -4,73 +4,85 @@ import os
 import plotly.express as px
 import ast
 
+# --- Configuração da Página ---
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 st.title("Painel de Controle de Recrutamento")
 
-# --- ETAPA 1: Definir os caminhos dos arquivos ---
+# --- ETAPA 1: Definição dos caminhos dos arquivos ---
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
-# --- ETAPA 2: Função para carregar e processar os dados (VERSÃO ROBUSTA) ---
+# --- ETAPA 2: Função de Carregamento e Processamento de Dados (VERSÃO FINAL E ROBUSTA) ---
 @st.cache_data
 def load_and_process_data(alloc_path, projects_path):
-    # Tenta carregar os arquivos CSV, com mensagens de erro claras se falhar
+    """
+    Função reescrita para ser à prova de falhas, garantindo que os dados
+    sejam carregados e processados de forma segura.
+    """
+    # 2.1: Validação dos Arquivos
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
-        st.error(f"ERRO: Um ou ambos os arquivos não foram encontrados. Verifique a localização de 'GeminiCheck.csv' e 'Projects.csv'.")
+        st.error(f"ERRO CRÍTICO: Um ou ambos os arquivos não foram encontrados. Verifique a localização de '{alloc_path}' e '{projects_path}'.")
         return None, None
     
-    df_alloc = pd.read_csv(alloc_path)
-    df_projects = pd.read_csv(projects_path)
+    df_alloc_raw = pd.read_csv(alloc_path)
+    df_projects_raw = pd.read_csv(projects_path)
 
-    if 'cotas' not in df_alloc.columns or 'resultado_cota' not in df_alloc.columns:
-        st.error("ERRO: Colunas 'cotas' ou 'resultado_cota' não encontradas em GeminiCheck.csv.")
-        return df_alloc, df_projects
-        
-    def safe_eval(val):
+    # 2.2: Validação das Colunas Essenciais
+    required_alloc_cols = ['quota_index', 'project_id', 'country', 'cotas', 'resultado_cota', 'Pessoas_Para_Recrututar', 'allocated_completes']
+    if not all(col in df_alloc_raw.columns for col in required_alloc_cols):
+        st.error(f"ERRO CRÍTICO: O arquivo 'GeminiCheck.csv' não contém todas as colunas necessárias. Estão faltando: {set(required_alloc_cols) - set(df_alloc_raw.columns)}")
+        return None, None
+
+    # 2.3: Processamento Seguro, Linha por Linha
+    processed_rows = []
+    for index, row in df_alloc_raw.iterrows():
         try:
-            # Converte para string para garantir que ast.literal_eval não falhe
-            return ast.literal_eval(str(val))
-        except (ValueError, SyntaxError):
-            return None
+            # Converte as strings de lista/tupla em objetos Python
+            keys = ast.literal_eval(row['cotas'])
+            values = ast.literal_eval(row['resultado_cota'])
 
-    # Processa cada linha para extrair os dados de cota de forma dinâmica e correta
-    parsed_data = []
-    for index, row in df_alloc.iterrows():
-        keys = safe_eval(row['cotas'])
-        values = safe_eval(row['resultado_cota'])
-        
-        row_dict = {}
-        if isinstance(keys, (list, tuple)) and isinstance(values, (list, tuple)) and len(keys) == len(values):
-            row_dict = dict(zip(keys, values))
-        parsed_data.append(row_dict)
+            # Cria um dicionário base com os dados da linha
+            base_data = row.to_dict()
+            
+            # Adiciona os dados demográficos ao dicionário base
+            if isinstance(keys, (list, tuple)) and isinstance(values, (list, tuple)) and len(keys) == len(values):
+                demographics = dict(zip(keys, values))
+                base_data.update(demographics)
+            
+            processed_rows.append(base_data)
 
-    new_cols_df = pd.DataFrame(parsed_data, index=df_alloc.index)
-    df_alloc_processed = pd.concat([df_alloc, new_cols_df], axis=1)
-    df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
-    
-    # Une com os dados de projetos para criar o QuotaLabel
-    df_projects.rename(columns={'index': 'quota_index'}, inplace=True)
-    df_alloc_processed['quota_index'] = pd.to_numeric(df_alloc_processed['quota_index'], errors='coerce')
-    df_alloc_processed.dropna(subset=['quota_index'], inplace=True)
-    df_alloc_processed['quota_index'] = df_alloc_processed['quota_index'].astype(int)
+        except (ValueError, SyntaxError, TypeError):
+            # Se uma linha falhar na conversão, ela é ignorada, mas o processo continua
+            continue
+            
+    if not processed_rows:
+        st.error("ERRO CRÍTICO: Nenhuma linha do 'GeminiCheck.csv' pôde ser processada. Verifique o formato das colunas 'cotas' e 'resultado_cota'.")
+        return None, None
 
-    # Função segura para criar o rótulo da cota
+    # 2.4: Criação dos DataFrames Finais
+    df_processed = pd.DataFrame(processed_rows)
+    df_processed.rename(columns={'country': 'pais'}, inplace=True)
+
+    # Adiciona o QuotaLabel para o filtro, tratando os tipos de dados
+    df_projects_raw.rename(columns={'index': 'quota_index'}, inplace=True)
+    df_processed['quota_index'] = pd.to_numeric(df_processed['quota_index'], errors='coerce')
+    df_processed.dropna(subset=['quota_index'], inplace=True)
+    df_processed['quota_index'] = df_processed['quota_index'].astype(int)
+
     def create_quota_label(row):
         parts = [f"Q:{row['quota_index']}"]
-        # Verifica se as colunas existem antes de usá-las
-        if '1' in row and pd.notna(row['1']) and str(row['1']) != '0': 
-            parts.append(f"Idade:{row['1']}")
-        if '2' in row and pd.notna(row['2']) and str(row['2']) != '0': 
-            parts.append(f"Gênero:{row['2']}")
+        if '1' in row and pd.notna(row['1']) and str(row['1']) != '0': parts.append(f"Idade:{row['1']}")
+        if '2' in row and pd.notna(row['2']) and str(row['2']) != '0': parts.append(f"Gênero:{row['2']}")
         return " | ".join(parts)
 
-    df_projects['QuotaLabel'] = df_projects.apply(create_quota_label, axis=1)
-    df_quotas_unique = df_projects.drop_duplicates(subset=['quota_index'])
+    df_projects_raw['QuotaLabel'] = df_projects_raw.apply(create_quota_label, axis=1)
+    df_quotas_unique = df_projects_raw.drop_duplicates(subset=['quota_index'])
     
-    df_merged = pd.merge(df_alloc_processed, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
-    
-    return df_merged, df_projects
+    df_final = pd.merge(df_processed, df_quotas_unique[['quota_index', 'QuotaLabel']], on='quota_index', how='left')
+
+    st.success("Dados carregados e processados com sucesso!")
+    return df_final, df_projects_raw
 
 # --- ETAPA 3: Carregar os dados ---
 df_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
@@ -82,10 +94,8 @@ if df_processed is not None:
     all_projects = sorted(df_processed['project_id'].unique())
     selected_projects = st.sidebar.multiselect('1. Selecione o(s) Projeto(s)', all_projects)
 
-    # DataFrame temporário com base na seleção de projetos para popular outros filtros
     df_temp = df_processed[df_processed['project_id'].isin(selected_projects)] if selected_projects else df_processed
 
-    # Filtros secundários SEM seleção padrão para evitar conflitos
     all_labels = sorted(df_temp['QuotaLabel'].dropna().unique())
     selected_labels = st.sidebar.multiselect('2. [Opcional] Selecione a(s) Cota(s)', all_labels)
     
@@ -121,10 +131,10 @@ if df_processed is not None and df_projects is not None:
     tab_tabelas, tab_graficos = st.tabs(["Tabelas de Dados", "Gráficos de Cotas"])
 
     with tab_tabelas:
-        st.header("Dados de Alocação Processados (`GeminiCheck.csv`)")
+        st.header("Dados de Alocação Processados")
         st.dataframe(df_filtered)
 
-        st.header("Dados das Cotas Iniciais (`Projects.csv`)")
+        st.header("Dados das Cotas Iniciais")
         if not df_filtered.empty:
             st.dataframe(df_projects[df_projects['quota_index'].isin(df_filtered['quota_index'].unique())])
         else:
