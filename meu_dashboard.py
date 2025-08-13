@@ -47,10 +47,13 @@ def load_and_process_data(alloc_path, projects_path):
 # --- ETAPA 3: Carregar os dados ---
 df_alloc_processed, df_projects = load_and_process_data(ALLOC_FILE, PROJECTS_FILE)
 
-# --- ETAPA 4: Filtros na barra lateral (LÓGICA CORRIGIDA) ---
+# --- ETAPA 4: Filtros na barra lateral ---
 if df_alloc_processed is not None:
     st.sidebar.header("Filtros")
     
+    # Adiciona o Modo de Depuração
+    debug_mode = st.sidebar.checkbox("Ativar Modo de Depuração")
+
     # DataFrame que será modificado pelos filtros
     df_filtered = df_alloc_processed.copy()
     df_projects_filtered = df_projects.copy()
@@ -72,14 +75,30 @@ if df_alloc_processed is not None:
     if selected_countries:
         df_filtered = df_filtered[df_filtered['pais'].isin(selected_countries)]
         
-        # Filtra a tabela de projetos também
         if 'pais' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['pais'].isin(selected_countries)]
         elif 'country' in df_projects_filtered.columns:
             df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
+# --- ETAPA 5: Seção de Depuração ---
+if debug_mode:
+    st.warning("--- MODO DE DEPURACÃO ATIVADO ---")
+    st.subheader("1. Seleções Atuais nos Filtros")
+    st.write(f"**Projetos Selecionados:** `{selected_projects}`")
+    st.write(f"**Países Selecionados:** `{selected_countries}`")
+    
+    st.subheader("2. Estado da Tabela `df_filtered` (usada nos gráficos)")
+    st.write(f"A tabela para os gráficos tem **{df_filtered.shape[0]} linhas** e **{df_filtered.shape[1]} colunas**.")
+    st.write("Amostra dos dados:")
+    st.dataframe(df_filtered.head())
+    
+    st.subheader("3. Países Únicos na Tabela Filtrada")
+    if not df_filtered.empty:
+        st.write(df_filtered['pais'].unique())
+    st.warning("--- FIM DA DEPURAÇÃO ---")
 
-# --- ETAPA 5: Criar as abas do dashboard ---
+
+# --- ETAPA 6: Criar as abas do dashboard ---
 if df_alloc_processed is not None and df_projects is not None:
     tab_graficos, tab_tabelas = st.tabs(["Gráficos de Cotas", "Tabelas de Dados"])
 
