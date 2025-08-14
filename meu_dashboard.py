@@ -155,10 +155,10 @@ if df_alloc_processed is not None and df_projects is not None:
                     st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tabelas:
-        st.header("Dados de Alocação")
-        st.dataframe(df_filtered)
-        st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
-
         st.header("Dados das Cotas Iniciais")
         st.dataframe(df_projects_filtered)
         st.info(f"Mostrando {len(df_projects_filtered)} de {len(df_projects)} linhas.")
+        
+        st.header("Dados de Alocação")
+        st.dataframe(df_filtered)
+        st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
