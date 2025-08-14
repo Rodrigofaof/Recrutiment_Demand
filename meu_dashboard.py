@@ -8,11 +8,9 @@ st.set_page_config(layout="wide")
 
 st.title("Painel de Controle de Recrutamento")
 
-# --- ETAPA 1: Definir os caminhos dos arquivos ---
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
-# --- ETAPA 2: Função para carregar e processar os dados ---
 @st.cache_data
 def load_and_process_data(alloc_path, projects_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
@@ -44,8 +42,6 @@ def load_and_process_data(alloc_path, projects_path):
     df_alloc_processed = pd.concat([df_alloc, dynamic_df], axis=1)
     df_alloc_processed.rename(columns={'country': 'pais'}, inplace=True)
     
-    # --- INÍCIO DAS NOVAS SUBSTITUIÇÕES ---
-    # Substitui os valores '0' por textos descritivos
     if 'Region' in df_alloc_processed.columns:
         # Usamos .astype(str) para garantir que a comparação com '0' funcione
         df_alloc_processed['Region'] = df_alloc_processed['Region'].astype(str).replace('0', 'Qualquer Região')
@@ -159,10 +155,10 @@ if df_alloc_processed is not None and df_projects is not None:
                     st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tabelas:
-        st.header("Dados de Alocação (`GeminiCheck.csv`)")
+        st.header("Dados de Alocação")
         st.dataframe(df_filtered)
         st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
 
-        st.header("Dados das Cotas Iniciais (`Projects.csv`)")
+        st.header("Dados das Cotas Iniciais")
         st.dataframe(df_projects_filtered)
         st.info(f"Mostrando {len(df_projects_filtered)} de {len(df_projects)} linhas.")
