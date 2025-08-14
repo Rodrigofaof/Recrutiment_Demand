@@ -14,14 +14,14 @@ PROJECTS_FILE = 'Projects.csv'
 @st.cache_data
 def load_and_process_data(alloc_path, projects_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
-        st.error(f"ERRO: Um ou ambos os arquivos não foram encontrados. Verifique 'GeminiCheck.csv' e 'Projects.csv'.")
+        st.error(f"ERRO: Um ou ambos os arquivos não foram encontrados. Verifique 'Completes.csv' e 'Projects.csv'.")
         return None, None
     
     df_alloc = pd.read_csv(alloc_path)
     df_projects = pd.read_csv(projects_path)
 
     if 'cotas' not in df_alloc.columns or 'resultado_cota' not in df_alloc.columns:
-        st.error("ERRO: Colunas 'cotas' ou 'resultado_cota' não encontradas em GeminiCheck.csv.")
+        st.error("ERRO: Colunas 'cotas' ou 'resultado_cota' não encontradas em Completes.csv.")
         return df_alloc, df_projects
         
     def extract_dynamic_data(row):
