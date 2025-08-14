@@ -8,7 +8,7 @@ st.set_page_config(layout="wide")
 
 st.title("Painel de Controle de Recrutamento")
 
-ALLOC_FILE = 'Completes.csv'
+ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
 @st.cache_data
