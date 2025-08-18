@@ -9,7 +9,7 @@ st.set_page_config(layout="wide")
 
 st.title("Dynamic Recruitment Dashboard")
 
-ALLOC_FILE = 'GeminiCheck.csv' 
+ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
 @st.cache_data
@@ -46,6 +46,7 @@ def load_and_generate_plan(alloc_path, projects_path):
                 new_row = row._asdict()
                 new_row['plan_date'] = plan_date
                 new_row['daily_recruitment_goal'] = daily_goal
+                new_row['original_quota_index'] = row.Index # Adiciona o índice original
                 del new_row['Index']
                 daily_plan.append(new_row)
 
@@ -154,10 +155,14 @@ if df_plan is not None and not df_plan.empty:
         else:
             st.markdown("---")
             total_goal = df_filtered['daily_recruitment_goal'].sum()
+            
+            # --- LÓGICA CORRIGIDA PARA O KPI 2 ---
+            unique_quota_indices = df_filtered['original_quota_index'].unique()
+            total_completes_needed = df_alloc_original.loc[unique_quota_indices, 'Pessoas_Para_Recrutar'].sum()
+
             kpi1, kpi2 = st.columns(2)
-            kpi1.metric(label="Total Recruitment Goal", value=f"{int(total_goal):,}")
-            # --- CORREÇÃO APLICADA AQUI ---
-            kpi2.metric(label="Completes Needed", value=f"{len(df_filtered):,}")
+            kpi1.metric(label="Recruitment Goal for Period", value=f"{int(total_goal):,}")
+            kpi2.metric(label="Total Completes for Active Quotas", value=f"{int(total_completes_needed):,}")
 
             st.markdown("---")
             
@@ -187,7 +192,7 @@ if df_plan is not None and not df_plan.empty:
 
     with tab_tables:
         st.header("Detailed Recruitment Plan")
-        display_cols = ['plan_date', 'daily_recruitment_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'allocated_completes','Pessoas_Para_Recrutar', 'DaystoDeliver']
+        display_cols = ['plan_date', 'daily_recruitment_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
