@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import plotly.express as px
 import ast
+from datetime import datetime
 
 st.set_page_config(layout="wide")
 
@@ -10,6 +11,16 @@ st.title("Recruitment Dashboard")
 
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
+
+try:
+    alloc_mod_time = os.path.getmtime(ALLOC_FILE)
+    projects_mod_time = os.path.getmtime(PROJECTS_FILE)
+    latest_mod_timestamp = max(alloc_mod_time, projects_mod_time)
+    latest_update_dt = datetime.fromtimestamp(latest_mod_timestamp)
+    last_update_str = latest_update_dt.strftime("%Y-%m-%d %H:%M:%S")
+    st.caption(f"Data last updated on: {last_update_str}")
+except FileNotFoundError:
+    st.caption("Data files not found, timestamp unavailable.")
 
 @st.cache_data
 def load_and_process_data(alloc_path, projects_path):
@@ -150,5 +161,5 @@ if df_alloc_processed is not None and df_projects is not None:
         st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects)} rows.")
         
         st.header("Allocation Data")
-        st.dataframe(df_filtered.rename(Columns={'pais':'country','CR_preenchido':'CR_filled'})[['project_id','country','allocated_completes','CR_filled','People_To_Recruit','Start Date','days_in_field','Expected Date','DaystoDeliver','age_group','SEL','Gender','Region']].reset_index(drop=True))
+        st.dataframe(df_filtered[['project_id','country','allocated_completes','CR_filled','People_To_Recruit','Start Date','days_in_field','Expected Date','DaystoDeliver','age_group','SEL','Gender','Region']].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_alloc_processed)} rows.")
