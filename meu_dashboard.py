@@ -168,9 +168,9 @@ if df_plan is not None and not df_plan.empty:
             total_completes_needed = df_alloc_original.loc[unique_quota_indices, 'allocated_completes'].sum()
 
             kpi1, kpi2, kpi3 = st.columns(3)
-            kpi1.metric(label="Meta de Recrutamento (Período)", value=f"{int(recruitment_goal):,}")
-            kpi2.metric(label="Meta de Alocados (Período)", value=f"{int(allocated_goal):,}")
-            kpi3.metric(label="Total Necessário (Cotas Ativas)", value=f"{int(total_completes_needed):,}")
+            kpi1.metric(label="Recruitment Needed (Date Range)", value=f"{int(recruitment_goal):,}")
+            kpi2.metric(label="Completes Needed (Date Range)", value=f"{int(allocated_goal):,}")
+            kpi3.metric(label="Completes Needed (Total)", value=f"{int(total_completes_needed):,}")
 
             st.markdown("---")
             
