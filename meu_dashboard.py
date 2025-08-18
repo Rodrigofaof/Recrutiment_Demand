@@ -160,5 +160,5 @@ if df_alloc_processed is not None and df_projects is not None:
         st.info(f"Mostrando {len(df_projects_filtered)} de {len(df_projects)} linhas.")
         
         st.header("Dados de Alocação")
-        st.dataframe(df_filtered.rename(Columns={'pais':'country','CR_preenchido':'CR_filled'})[['project_id','pais','allocated_completes','CR_preenchido','Pessoas_Para_Recrutar','Start Date','days_in_field','Expected Date','DaystoDeliver','age_group','SEL','Gender','Region']].reset_index(drop=True))
+        st.dataframe(df_filtered[['project_id','pais','allocated_completes','Pessoas_Para_Recrutar','Start Date','days_in_field','Expected Date','DaystoDeliver','age_group','SEL','Gender','Region']].reset_index(drop=True))
         st.info(f"Mostrando {len(df_filtered)} de {len(df_alloc_processed)} linhas.")
