@@ -157,7 +157,7 @@ if df_plan is not None and not df_plan.empty:
             kpi1, kpi2 = st.columns(2)
             kpi1.metric(label="Total Recruitment Goal", value=f"{int(total_goal):,}")
             # --- CORREÇÃO APLICADA AQUI ---
-            kpi2.metric(label="Active Quotas in Period", value=f"{len(df_filtered):,}")
+            kpi2.metric(label="Completes Needed", value=f"{len(df_filtered):,}")
 
             st.markdown("---")
             
@@ -187,7 +187,7 @@ if df_plan is not None and not df_plan.empty:
 
     with tab_tables:
         st.header("Detailed Recruitment Plan")
-        display_cols = ['plan_date', 'daily_recruitment_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'DaystoDeliver']
+        display_cols = ['plan_date', 'daily_recruitment_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'allocated_completes','Pessoas_Para_Recrutar', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
