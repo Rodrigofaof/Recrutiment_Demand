@@ -34,11 +34,9 @@ def load_and_generate_plan(alloc_path, projects_path):
         
         days_to_deliver = int(days_to_deliver)
 
-        # Distribution logic for Recruitment
         base_goal = total_recruits // days_to_deliver
         remainder = total_recruits % days_to_deliver
         
-        # Distribution logic for Allocated Completes
         base_allocated = total_allocated // days_to_deliver
         remainder_allocated = total_allocated % days_to_deliver
         
@@ -47,12 +45,11 @@ def load_and_generate_plan(alloc_path, projects_path):
             daily_goal = base_goal + 1 if i < remainder else base_goal
             daily_allocated_goal = base_allocated + 1 if i < remainder_allocated else base_allocated
 
-            # We only need a row if there is some goal for that day
             if daily_goal > 0 or daily_allocated_goal > 0:
                 new_row = row._asdict()
                 new_row['plan_date'] = plan_date
                 new_row['daily_recruitment_goal'] = daily_goal
-                new_row['daily_allocated_goal'] = daily_allocated_goal # Add new daily goal
+                new_row['daily_allocated_goal'] = daily_allocated_goal
                 new_row['original_quota_index'] = row.Index
                 del new_row['Index']
                 daily_plan.append(new_row)
@@ -132,23 +129,32 @@ if df_plan is not None and not df_plan.empty:
         if 'country' in df_projects_filtered.columns:
              df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
+    # --- NOVO FILTRO DE RECRUTAMENTO ---
+    if 'Recruitment' in df_filtered.columns:
+        all_recruitment_options = sorted(df_filtered['Recruitment'].dropna().unique())
+        selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
+        if selected_recruitment:
+            df_filtered = df_filtered[df_filtered['Recruitment'].isin(selected_recruitment)]
+            if 'Recruitment' in df_projects_filtered.columns:
+                df_projects_filtered = df_projects_filtered[df_projects_filtered['Recruitment'].isin(selected_recruitment)]
+
     all_regions = sorted(df_filtered['Region'].dropna().unique())
-    selected_regions = st.sidebar.multiselect('4. Region(s)', all_regions)
+    selected_regions = st.sidebar.multiselect('5. Region(s)', all_regions)
     if selected_regions:
         df_filtered = df_filtered[df_filtered['Region'].isin(selected_regions)]
 
     all_age_groups = sorted(df_filtered['age_group'].dropna().unique())
-    selected_age_groups = st.sidebar.multiselect('5. Age Group', all_age_groups)
+    selected_age_groups = st.sidebar.multiselect('6. Age Group', all_age_groups)
     if selected_age_groups:
         df_filtered = df_filtered[df_filtered['age_group'].isin(selected_age_groups)]
 
     all_genders = sorted(df_filtered['Gender'].dropna().unique())
-    selected_genders = st.sidebar.multiselect('6. Gender', all_genders)
+    selected_genders = st.sidebar.multiselect('7. Gender', all_genders)
     if selected_genders:
         df_filtered = df_filtered[df_filtered['Gender'].isin(selected_genders)]
         
     all_sels = sorted(df_filtered['SEL'].dropna().unique())
-    selected_sels = st.sidebar.multiselect('7. Social Class (SEL)', all_sels)
+    selected_sels = st.sidebar.multiselect('8. Social Class (SEL)', all_sels)
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
@@ -200,11 +206,11 @@ if df_plan is not None and not df_plan.empty:
                 st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tables:
-        st.header("Allocated Targets")
-        display_cols = ['plan_date', 'daily_recruitment_goal', 'daily_allocated_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes', 'DaystoDeliver']
+        st.header("Detailed Recruitment Plan")
+        display_cols = ['plan_date', 'daily_recruitment_goal', 'daily_allocated_goal', 'project_id', 'country', 'Recruitment', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
-        st.header("Original Target")
+        st.header("Original Projects Data")
         st.dataframe(df_projects_filtered)
         st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects_original)} projects.")
