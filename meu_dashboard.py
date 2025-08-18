@@ -158,7 +158,7 @@ if df_plan is not None and not df_plan.empty:
             
             # --- LÓGICA CORRIGIDA PARA O KPI 2 ---
             unique_quota_indices = df_filtered['original_quota_index'].unique()
-            total_completes_needed = df_alloc_original.loc[unique_quota_indices, 'Pessoas_Para_Recrutar'].sum()
+            total_completes_needed = df_alloc_original.loc[unique_quota_indices, 'allocated_completes'].sum()
 
             kpi1, kpi2 = st.columns(2)
             kpi1.metric(label="Recruitment Goal for Period", value=f"{int(total_goal):,}")
