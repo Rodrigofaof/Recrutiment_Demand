@@ -7,7 +7,7 @@ from datetime import date, timedelta
 
 st.set_page_config(layout="wide")
 
-st.title("Daily Recruitment Dashboard")
+st.title("Dynamic Recruitment Dashboard")
 
 ALLOC_FILE = 'GeminiCheck.csv' 
 PROJECTS_FILE = 'Projects.csv'
@@ -21,7 +21,6 @@ def load_and_generate_plan(alloc_path, projects_path):
     df_alloc = pd.read_csv(alloc_path)
     df_projects = pd.read_csv(projects_path)
 
-    # --- 1. Generate Daily Plan ---
     today = date.today()
     daily_plan = []
     
@@ -57,7 +56,6 @@ def load_and_generate_plan(alloc_path, projects_path):
     df_daily_plan = pd.DataFrame(daily_plan)
     df_daily_plan['plan_date'] = pd.to_datetime(df_daily_plan['plan_date']).dt.date
 
-    # --- 2. Process for dynamic columns (like original script) ---
     def extract_dynamic_data(row_series):
         try:
             keys = ast.literal_eval(row_series['cotas'])
@@ -72,7 +70,6 @@ def load_and_generate_plan(alloc_path, projects_path):
     dynamic_df = pd.DataFrame(dynamic_data.tolist(), index=df_daily_plan.index)
     df_daily_plan_processed = pd.concat([df_daily_plan, dynamic_df], axis=1)
 
-    # --- 3. Final Cleaning ---
     if 'Region' in df_daily_plan_processed.columns:
         df_daily_plan_processed['Region'] = df_daily_plan_processed['Region'].astype(str).replace('0', 'Any Region')
     if 'SEL' in df_daily_plan_processed.columns:
@@ -83,36 +80,48 @@ def load_and_generate_plan(alloc_path, projects_path):
 
     return df_alloc, df_projects, df_daily_plan_processed
 
-# --- Load all data ---
 df_alloc_original, df_projects_original, df_plan = load_and_generate_plan(ALLOC_FILE, PROJECTS_FILE)
 
-# --- Sidebar Filters ---
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filters")
 
-    # 1. DATE FILTER (PRIMARY)
-    min_date = df_plan['plan_date'].min()
-    max_date = df_plan['plan_date'].max()
-    selected_date = st.sidebar.date_input("1. Select Date", value=date.today(), min_value=min_date, max_value=max_date)
+    # 1. DATE FILTER (OPTIONAL RANGE)
+    use_date_filter = st.sidebar.checkbox("Filter by date range")
+    
+    df_filtered_by_date = df_plan.copy()
+    header_title = "Overall Recruitment Demand"
 
-    # Filter by date first
-    df_filtered_by_date = df_plan[df_plan['plan_date'] == selected_date].copy()
+    if use_date_filter:
+        min_date = df_plan['plan_date'].min()
+        max_date = df_plan['plan_date'].max()
+        
+        # The date_input becomes a range selector by passing a list/tuple of two dates
+        selected_range = st.sidebar.date_input(
+            "1. Select Date Range", 
+            value=(min_date, min_date + timedelta(days=7)), # Default to a 7-day range
+            min_value=min_date, 
+            max_value=max_date
+        )
+        
+        if len(selected_range) == 2:
+            start_date, end_date = selected_range
+            df_filtered_by_date = df_plan[
+                (df_plan['plan_date'] >= start_date) & (df_plan['plan_date'] <= end_date)
+            ]
+            header_title = f"Recruitment Demand for: {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}"
 
     # 2. OTHER FILTERS
-    all_projects = sorted(df_filtered_by_date['project_id'].unique())
-    selected_projects = st.sidebar.multiselect('2. Project(s)', all_projects)
-    
-    if selected_projects:
-        df_filtered_by_date = df_filtered_by_date[df_filtered_by_date['project_id'].isin(selected_projects)]
-
-    all_countries = sorted(df_filtered_by_date['country'].dropna().unique())
-    selected_countries = st.sidebar.multiselect('3. Country(ies)', all_countries)
-    
-    if selected_countries:
-        df_filtered_by_date = df_filtered_by_date[df_filtered_by_date['country'].isin(selected_countries)]
-    
-    # --- The rest of the filters now operate on the date-filtered data ---
     df_filtered = df_filtered_by_date
+    
+    all_projects = sorted(df_filtered['project_id'].unique())
+    selected_projects = st.sidebar.multiselect('2. Project(s)', all_projects)
+    if selected_projects:
+        df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
+
+    all_countries = sorted(df_filtered['country'].dropna().unique())
+    selected_countries = st.sidebar.multiselect('3. Country(ies)', all_countries)
+    if selected_countries:
+        df_filtered = df_filtered[df_filtered['country'].isin(selected_countries)]
     
     all_regions = sorted(df_filtered['Region'].dropna().unique())
     selected_regions = st.sidebar.multiselect('4. Region(s)', all_regions)
@@ -134,20 +143,19 @@ if df_plan is not None and not df_plan.empty:
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
-    # --- Dashboard Tabs ---
-    tab_charts, tab_tables = st.tabs(["Daily Goal Charts", "Data Tables"])
+    tab_charts, tab_tables = st.tabs(["Demand Charts", "Data Tables"])
 
     with tab_charts:
-        st.header(f"Recruitment Demand for: {selected_date.strftime('%Y-%m-%d')}")
+        st.header(header_title)
         
         if df_filtered.empty:
-            st.warning("No recruitment goals found for the selected date and filters.")
+            st.warning("No recruitment goals found for the selected filters.")
         else:
             st.markdown("---")
-            total_daily_goal = df_filtered['daily_recruitment_goal'].sum()
+            total_goal = df_filtered['daily_recruitment_goal'].sum()
             kpi1, kpi2 = st.columns(2)
-            kpi1.metric(label="Today's Recruitment Goal", value=f"{int(total_daily_goal):,}")
-            kpi2.metric(label="Active Quotas for Today", value=f"{len(df_filtered):,}")
+            kpi1.metric(label="Total Recruitment Goal", value=f"{int(total_goal):,}")
+            kpi2.metric(label="Active Quotas in Period", value=f"{len(df_filtered):,}")
             st.markdown("---")
             
             custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
@@ -175,7 +183,7 @@ if df_plan is not None and not df_plan.empty:
                 st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tables:
-        st.header(f"Daily Recruitment Plan for {selected_date.strftime('%Y-%m-%d')}")
+        st.header("Detailed Recruitment Plan")
         display_cols = ['plan_date', 'daily_recruitment_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
