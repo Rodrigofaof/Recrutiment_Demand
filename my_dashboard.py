@@ -85,7 +85,6 @@ df_alloc_original, df_projects_original, df_plan = load_and_generate_plan(ALLOC_
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filters")
 
-    # 1. DATE FILTER (OPTIONAL RANGE)
     use_date_filter = st.sidebar.checkbox("Filter by date range")
     
     df_filtered_by_date = df_plan.copy()
@@ -109,9 +108,8 @@ if df_plan is not None and not df_plan.empty:
             ]
             header_title = f"Recruitment Demand for: {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}"
 
-    # 2. OTHER FILTERS
     df_filtered = df_filtered_by_date
-    df_projects_filtered = df_projects_original.copy() # Create a copy to filter
+    df_projects_filtered = df_projects_original.copy()
 
     all_projects = sorted(df_filtered['project_id'].unique())
     selected_projects = st.sidebar.multiselect('2. Project(s)', all_projects)
@@ -123,7 +121,6 @@ if df_plan is not None and not df_plan.empty:
     selected_countries = st.sidebar.multiselect('3. Country(ies)', all_countries)
     if selected_countries:
         df_filtered = df_filtered[df_filtered['country'].isin(selected_countries)]
-        # Also filter the projects dataframe
         if 'country' in df_projects_filtered.columns:
              df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
@@ -159,7 +156,9 @@ if df_plan is not None and not df_plan.empty:
             total_goal = df_filtered['daily_recruitment_goal'].sum()
             kpi1, kpi2 = st.columns(2)
             kpi1.metric(label="Total Recruitment Goal", value=f"{int(total_goal):,}")
-            kpi2.metric(label="Active Quotas in Period", value=f"{df_filtered['project_id'].nunique():,}")
+            # --- CORREÇÃO APLICADA AQUI ---
+            kpi2.metric(label="Active Quotas in Period", value=f"{len(df_filtered):,}")
+
             st.markdown("---")
             
             custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
@@ -193,5 +192,5 @@ if df_plan is not None and not df_plan.empty:
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
         st.header("Original Projects Data")
-        st.dataframe(df_projects_filtered) # Use the new filtered dataframe
+        st.dataframe(df_projects_filtered)
         st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects_original)} projects.")
