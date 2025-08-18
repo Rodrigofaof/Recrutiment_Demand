@@ -200,11 +200,11 @@ if df_plan is not None and not df_plan.empty:
                 st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tables:
-        st.header("Detailed Recruitment Plan")
+        st.header("Allocated Targets")
         display_cols = ['plan_date', 'daily_recruitment_goal', 'daily_allocated_goal', 'project_id', 'country', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
-        st.header("Original Projects Data")
+        st.header("Original Target")
         st.dataframe(df_projects_filtered)
         st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects_original)} projects.")
