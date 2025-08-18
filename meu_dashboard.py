@@ -95,10 +95,9 @@ if df_plan is not None and not df_plan.empty:
         min_date = df_plan['plan_date'].min()
         max_date = df_plan['plan_date'].max()
         
-        # The date_input becomes a range selector by passing a list/tuple of two dates
         selected_range = st.sidebar.date_input(
             "1. Select Date Range", 
-            value=(min_date, min_date + timedelta(days=7)), # Default to a 7-day range
+            value=(min_date, min_date + timedelta(days=7)),
             min_value=min_date, 
             max_value=max_date
         )
@@ -112,17 +111,22 @@ if df_plan is not None and not df_plan.empty:
 
     # 2. OTHER FILTERS
     df_filtered = df_filtered_by_date
-    
+    df_projects_filtered = df_projects_original.copy() # Create a copy to filter
+
     all_projects = sorted(df_filtered['project_id'].unique())
     selected_projects = st.sidebar.multiselect('2. Project(s)', all_projects)
     if selected_projects:
         df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
+        df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
 
     all_countries = sorted(df_filtered['country'].dropna().unique())
     selected_countries = st.sidebar.multiselect('3. Country(ies)', all_countries)
     if selected_countries:
         df_filtered = df_filtered[df_filtered['country'].isin(selected_countries)]
-    
+        # Also filter the projects dataframe
+        if 'country' in df_projects_filtered.columns:
+             df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
+
     all_regions = sorted(df_filtered['Region'].dropna().unique())
     selected_regions = st.sidebar.multiselect('4. Region(s)', all_regions)
     if selected_regions:
@@ -155,7 +159,7 @@ if df_plan is not None and not df_plan.empty:
             total_goal = df_filtered['daily_recruitment_goal'].sum()
             kpi1, kpi2 = st.columns(2)
             kpi1.metric(label="Total Recruitment Goal", value=f"{int(total_goal):,}")
-            kpi2.metric(label="Active Quotas in Period", value=f"{len(df_filtered):,}")
+            kpi2.metric(label="Active Quotas in Period", value=f"{df_filtered['project_id'].nunique():,}")
             st.markdown("---")
             
             custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
@@ -189,4 +193,5 @@ if df_plan is not None and not df_plan.empty:
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
         st.header("Original Projects Data")
-        st.dataframe(df_projects_original)
+        st.dataframe(df_projects_filtered) # Use the new filtered dataframe
+        st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects_original)} projects.")
