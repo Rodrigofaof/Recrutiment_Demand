@@ -4,11 +4,6 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
-from langchain_community.document_loaders import CSVLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain.chains import RetrievalQA
 
 st.set_page_config(layout="wide")
 
@@ -134,6 +129,7 @@ if df_plan is not None and not df_plan.empty:
         if 'country' in df_projects_filtered.columns:
              df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
+    # --- NOVO FILTRO DE RECRUTAMENTO ---
     if 'Recruitment' in df_filtered.columns:
         all_recruitment_options = sorted(df_filtered['Recruitment'].dropna().unique())
         selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
@@ -161,50 +157,6 @@ if df_plan is not None and not df_plan.empty:
     selected_sels = st.sidebar.multiselect('8. Social Class (SEL)', all_sels)
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
-
-    st.sidebar.markdown("---")
-    st.sidebar.header("Ask the AI about the Data")
-    
-    if "qa_chain" not in st.session_state:
-        st.session_state.qa_chain = None
-
-    google_api_key = st.secrets.get("GOOGLE_API_KEY")
-
-    if google_api_key and os.path.exists(ALLOC_FILE):
-        if st.session_state.qa_chain is None:
-            with st.spinner(f"Initializing AI to read '{ALLOC_FILE}'..."):
-                loader = CSVLoader(file_path=ALLOC_FILE, encoding='utf-8')
-                documentos = loader.load()
-
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-                textos = text_splitter.split_documents(documentos)
-
-                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
-                vectorstore = FAISS.from_documents(textos, embeddings)
-
-                llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
-                st.session_state.qa_chain = RetrievalQA.from_chain_type(
-                    llm=llm,
-                    chain_type="stuff",
-                    retriever=vectorstore.as_retriever()
-                )
-                st.sidebar.success("AI is ready!")
-    elif not google_api_key:
-        st.sidebar.warning("Please add your Google API Key to the Streamlit Secrets.")
-
-
-    pergunta_ia = st.sidebar.text_input("Ask a question about the recruitment data:")
-
-    if st.sidebar.button("Get Answer"):
-        if st.session_state.qa_chain and pergunta_ia:
-            with st.spinner("Thinking..."):
-                resposta = st.session_state.qa_chain.invoke(pergunta_ia)
-                st.sidebar.write("### Answer")
-                st.sidebar.write(resposta["result"])
-        elif st.session_state.qa_chain is None:
-            st.sidebar.error("AI could not be initialized. Check the API key and file path.")
-        else:
-            st.sidebar.warning("Please enter a question.")
 
     tab_charts, tab_tables = st.tabs(["Demand Charts", "Data Tables"])
 
