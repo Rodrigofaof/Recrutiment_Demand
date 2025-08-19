@@ -14,8 +14,10 @@ st.set_page_config(layout="wide")
 
 st.title("Dynamic Recruitment Dashboard")
 
+# --- Constantes de Arquivos ---
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
+FAISS_INDEX_PATH = "faiss_index"  # Caminho para salvar/carregar o índice da IA
 
 @st.cache_data
 def load_and_generate_plan(alloc_path, projects_path):
@@ -172,15 +174,21 @@ if df_plan is not None and not df_plan.empty:
 
     if google_api_key and os.path.exists(ALLOC_FILE):
         if st.session_state.qa_chain is None:
-            with st.spinner(f"Initializing AI to read '{ALLOC_FILE}'..."):
-                loader = CSVLoader(file_path=ALLOC_FILE, encoding='utf-8')
-                documentos = loader.load()
-
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-                textos = text_splitter.split_documents(documentos)
-
+            with st.spinner("Initializing AI..."):
                 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
-                vectorstore = FAISS.from_documents(textos, embeddings)
+                
+                if os.path.exists(FAISS_INDEX_PATH):
+                    st.sidebar.info(f"Loading existing AI index from '{FAISS_INDEX_PATH}'...")
+                    vectorstore = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
+                else:
+                    st.sidebar.info(f"AI index not found. Creating a new one from '{ALLOC_FILE}'...")
+                    loader = CSVLoader(file_path=ALLOC_FILE, encoding='utf-8')
+                    documentos = loader.load()
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+                    textos = text_splitter.split_documents(documentos)
+                    vectorstore = FAISS.from_documents(textos, embeddings)
+                    vectorstore.save_local(FAISS_INDEX_PATH)
+                    st.sidebar.info(f"New index saved to '{FAISS_INDEX_PATH}'.")
 
                 llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
                 st.session_state.qa_chain = RetrievalQA.from_chain_type(
@@ -219,7 +227,7 @@ if df_plan is not None and not df_plan.empty:
             allocated_goal = df_filtered['daily_allocated_goal'].sum()
             
             unique_quota_indices = df_filtered['original_quota_index'].unique()
-            total_completes_needed = df_alloc_original.loc[unique_quota_indices, 'allocated_completes'].sum()
+            total_completes_needed = df_alloc_original.loc[df_alloc_original.index.isin(unique_quota_indices), 'allocated_completes'].sum()
 
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric(label="Recruitment Needed (Date Range)", value=f"{int(recruitment_goal):,}")
