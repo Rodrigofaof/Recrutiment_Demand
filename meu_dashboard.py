@@ -17,6 +17,9 @@ st.title("Dynamic Recruitment Dashboard")
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
+# Substitua pela sua chave da API do Google
+GOOGLE_API_KEY = "SUA_CHAVE_API_VAI_AQUI"
+
 @st.cache_data
 def load_and_generate_plan(alloc_path, projects_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
@@ -165,12 +168,10 @@ if df_plan is not None and not df_plan.empty:
     st.sidebar.markdown("---")
     st.sidebar.header("Ask the AI about the Data")
     
-    google_api_key = st.sidebar.text_input("Google API Key", type="password", key="api_key")
-
     if "qa_chain" not in st.session_state:
         st.session_state.qa_chain = None
 
-    if google_api_key and os.path.exists(ALLOC_FILE):
+    if GOOGLE_API_KEY and GOOGLE_API_KEY != "AIzaSyAGGAOq9D9NSD3ZSDY-zil1fCmGYs9xr9c" and os.path.exists(ALLOC_FILE):
         if st.session_state.qa_chain is None:
             with st.spinner(f"Initializing AI to read '{ALLOC_FILE}'..."):
                 loader = CSVLoader(file_path=ALLOC_FILE, encoding='utf-8')
@@ -179,16 +180,19 @@ if df_plan is not None and not df_plan.empty:
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
                 textos = text_splitter.split_documents(documentos)
 
-                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
+                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
                 vectorstore = FAISS.from_documents(textos, embeddings)
 
-                llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
+                llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=GOOGLE_API_KEY, convert_system_message_to_human=True)
                 st.session_state.qa_chain = RetrievalQA.from_chain_type(
                     llm=llm,
                     chain_type="stuff",
                     retriever=vectorstore.as_retriever()
                 )
                 st.sidebar.success("AI is ready!")
+    elif GOOGLE_API_KEY == "AIzaSyAGGAOq9D9NSD3ZSDY-zil1fCmGYs9xr9c":
+        st.sidebar.warning("Please add your Google API Key to the script.")
+
 
     pergunta_ia = st.sidebar.text_input("Ask a question about the recruitment data:")
 
@@ -198,10 +202,8 @@ if df_plan is not None and not df_plan.empty:
                 resposta = st.session_state.qa_chain.invoke(pergunta_ia)
                 st.sidebar.write("### Answer")
                 st.sidebar.write(resposta["result"])
-        elif not google_api_key:
-            st.sidebar.warning("Please provide a Google API key to initialize the AI.")
         elif st.session_state.qa_chain is None:
-            st.sidebar.error("AI could not be initialized. Check the file path and API key.")
+            st.sidebar.error("AI could not be initialized. Check the API key and file path.")
         else:
             st.sidebar.warning("Please enter a question.")
 
