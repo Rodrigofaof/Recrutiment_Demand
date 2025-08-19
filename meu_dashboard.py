@@ -4,20 +4,13 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
-from langchain_community.document_loaders import CSVLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain.chains import RetrievalQA
 
 st.set_page_config(layout="wide")
 
 st.title("Dynamic Recruitment Dashboard")
 
-# --- Constantes de Arquivos ---
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
-FAISS_INDEX_PATH = "faiss_index"  # Caminho para salvar/carregar o índice da IA
 
 @st.cache_data
 def load_and_generate_plan(alloc_path, projects_path):
@@ -136,6 +129,7 @@ if df_plan is not None and not df_plan.empty:
         if 'country' in df_projects_filtered.columns:
              df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
+    # --- NOVO FILTRO DE RECRUTAMENTO ---
     if 'Recruitment' in df_filtered.columns:
         all_recruitment_options = sorted(df_filtered['Recruitment'].dropna().unique())
         selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
@@ -164,102 +158,6 @@ if df_plan is not None and not df_plan.empty:
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
 
-    st.sidebar.markdown("---")
-    st.sidebar.header("Ask the AI about the Data")
-    
-    if "qa_chain" not in st.session_state:
-        st.session_state.qa_chain = None
-
-    google_api_key = st.secrets.get("GOOGLE_API_KEY")
-
-    if google_api_key and os.path.exists(ALLOC_FILE):
-        if st.session_state.qa_chain is None:
-            with st.spinner("Initializing AI..."):
-                
-                # --- ETAPA 1: Carregar o CSV com Pandas ---
-                st.sidebar.info(f"Reading data from '{ALLOC_FILE}' to teach the AI...")
-                df_ia_data = pd.read_csv(ALLOC_FILE)
-
-                # --- ETAPA 2: Transformar cada linha em um "Documento" com contexto ---
-                # Importa a classe Document que precisamos
-                from langchain.schema import Document
-
-                documentos = []
-                for index, row in df_ia_data.iterrows():
-                    # Para cada linha, criamos uma frase descritiva.
-                    # Isso dá o contexto que a IA precisa!
-                    conteudo = (
-                        f"For project ID {row.get('project_id', 'N/A')}, "
-                        f"in country {row.get('country', 'N/A')} "
-                        f"for the {row.get('age_group', 'N/A')} age group and gender {row.get('Gender', 'N/A')}, "
-                        f"the recruitment goal is {row.get('Pessoas_Para_Recrutar', 0)} people. "
-                        f"The number of completes allocated is {row.get('allocated_completes', 0)}. "
-                        f"The recruitment type is {row.get('Recruitment', 'N/A')} "
-                        f"for social class (SEL) {row.get('SEL', 'N/A')} in region {row.get('Region', 'N/A')}."
-                    )
-                    # Adicionamos metadados para referência
-                    metadata = {"source": ALLOC_FILE, "row": index}
-                    documentos.append(Document(page_content=conteudo, metadata=metadata))
-
-                st.sidebar.info(f"Created {len(documentos)} documents for the AI's knowledge base.")
-                
-                # --- ETAPA 3: Criar o índice a partir dos nossos documentos personalizados ---
-                embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=google_api_key)
-                
-                if os.path.exists(FAISS_INDEX_PATH):
-                    st.sidebar.info(f"Loading existing AI index from '{FAISS_INDEX_PATH}'...")
-                    # NOTA: O índice antigo não serve mais, pois os documentos mudaram.
-                    # É melhor apagar a pasta 'faiss_index' para forçar a recriação.
-                    vectorstore = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
-                else:
-                    st.sidebar.info(f"AI index not found. Creating a new one...")
-                    # Não precisamos mais do TextSplitter, pois nossos documentos já são pequenos e com contexto
-                    vectorstore = FAISS.from_documents(documentos, embeddings)
-                    vectorstore.save_local(FAISS_INDEX_PATH)
-                    st.sidebar.info(f"New index saved to '{FAISS_INDEX_PATH}'.")
-
-                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, convert_system_message_to_human=True)
-                
-                st.session_state.qa_chain = RetrievalQA.from_chain_type(
-                    llm=llm,
-                    chain_type="stuff",
-                    retriever=vectorstore.as_retriever()
-                )
-                st.sidebar.success("AI is ready!")
-
-    elif not google_api_key:
-        st.sidebar.warning("Please add your Google API Key to the Streamlit Secrets.")
-
-
-    pergunta_ia = st.sidebar.text_input("Ask a question about the recruitment data:")
-
-    # Adicionamos um checkbox para ativar o modo de depuração
-    debug_mode = st.sidebar.checkbox("Show retrieved context (Debug Mode)")
-
-    if st.sidebar.button("Get Answer"):
-        if st.session_state.qa_chain and pergunta_ia:
-            with st.spinner("Thinking..."):
-                
-                # --- MODO DE DEPURAÇÃO ---
-                if debug_mode:
-                    # Apenas recuperamos os documentos, sem chamar o LLM
-                    retriever = st.session_state.qa_chain.retriever
-                    retrieved_docs = retriever.invoke(pergunta_ia)
-                    
-                    st.sidebar.write("### Retrieved Context (Debug)")
-                    for i, doc in enumerate(retrieved_docs):
-                        st.sidebar.info(f"--- Document {i+1} ---\n{doc.page_content}")
-                # --- FIM DO MODO DE DEPURAÇÃO ---
-
-                resposta = st.session_state.qa_chain.invoke(pergunta_ia)
-                st.sidebar.write("### Answer")
-                st.sidebar.write(resposta["result"])
-
-        elif st.session_state.qa_chain is None:
-            st.sidebar.error("AI could not be initialized. Check the API key and file path.")
-        else:
-            st.sidebar.warning("Please enter a question.")
-
     tab_charts, tab_tables = st.tabs(["Demand Charts", "Data Tables"])
 
     with tab_charts:
@@ -273,7 +171,7 @@ if df_plan is not None and not df_plan.empty:
             allocated_goal = df_filtered['daily_allocated_goal'].sum()
             
             unique_quota_indices = df_filtered['original_quota_index'].unique()
-            total_completes_needed = df_alloc_original.loc[df_alloc_original.index.isin(unique_quota_indices), 'allocated_completes'].sum()
+            total_completes_needed = df_alloc_original.loc[unique_quota_indices, 'allocated_completes'].sum()
 
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric(label="Recruitment Needed (Date Range)", value=f"{int(recruitment_goal):,}")
