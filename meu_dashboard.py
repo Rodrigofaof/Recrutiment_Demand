@@ -223,7 +223,7 @@ if df_plan is not None and not df_plan.empty:
 
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric(label="Recruitment Needed (Date Range)", value=f"{int(recruitment_goal):,}")
-            kpi2.metric(label="Completes Needed (Date Range)", valuef"{int(allocated_goal):,}")
+            kpi2.metric(label="Completes Needed (Date Range)", value=f"{int(allocated_goal):,}")
             kpi3.metric(label="Completes Needed (Total)", value=f"{int(total_completes_needed):,}")
 
             st.markdown("---")
