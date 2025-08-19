@@ -192,7 +192,7 @@ if df_plan is not None and not df_plan.empty:
                     st.sidebar.info(f"New index saved to '{FAISS_INDEX_PATH}'.")
 
                 # NOME DO MODELO CORRIGIDO
-                llm = ChatGoogleGenerativeAI(model="gemini-1.0-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
+                llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, convert_system_message_to_human=True)
                 
                 st.session_state.qa_chain = RetrievalQA.from_chain_type(
                     llm=llm,
