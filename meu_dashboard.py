@@ -176,7 +176,7 @@ if df_plan is not None and not df_plan.empty:
         if st.session_state.qa_chain is None:
             with st.spinner("Initializing AI..."):
                 # NOME DO MODELO CORRIGIDO
-                embeddings = GoogleGenerativeAIEmbeddings(model="text-embedding-004", google_api_key=google_api_key)
+                embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=google_api_key)
                 
                 if os.path.exists(FAISS_INDEX_PATH):
                     st.sidebar.info(f"Loading existing AI index from '{FAISS_INDEX_PATH}'...")
