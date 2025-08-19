@@ -17,9 +17,6 @@ st.title("Dynamic Recruitment Dashboard")
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 
-# Substitua pela sua chave da API do Google
-GOOGLE_API_KEY = "AIzaSyAGGAOq9D9NSD3ZSDY-zil1fCmGYs9xr9c"
-
 @st.cache_data
 def load_and_generate_plan(alloc_path, projects_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
@@ -171,7 +168,9 @@ if df_plan is not None and not df_plan.empty:
     if "qa_chain" not in st.session_state:
         st.session_state.qa_chain = None
 
-    if GOOGLE_API_KEY and GOOGLE_API_KEY != "AIzaSyAGGAOq9D9NSD3ZSDY-zil1fCmGYs9xr9c" and os.path.exists(ALLOC_FILE):
+    google_api_key = st.secrets.get("GOOGLE_API_KEY")
+
+    if google_api_key and os.path.exists(ALLOC_FILE):
         if st.session_state.qa_chain is None:
             with st.spinner(f"Initializing AI to read '{ALLOC_FILE}'..."):
                 loader = CSVLoader(file_path=ALLOC_FILE, encoding='utf-8')
@@ -180,18 +179,18 @@ if df_plan is not None and not df_plan.empty:
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
                 textos = text_splitter.split_documents(documentos)
 
-                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
                 vectorstore = FAISS.from_documents(textos, embeddings)
 
-                llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=GOOGLE_API_KEY, convert_system_message_to_human=True)
+                llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
                 st.session_state.qa_chain = RetrievalQA.from_chain_type(
                     llm=llm,
                     chain_type="stuff",
                     retriever=vectorstore.as_retriever()
                 )
                 st.sidebar.success("AI is ready!")
-    elif GOOGLE_API_KEY == "AIzaSyAGGAOq9D9NSD3ZSDY-zil1fCmGYs9xr9c":
-        st.sidebar.warning("Please add your Google API Key to the script.")
+    elif not google_api_key:
+        st.sidebar.warning("Please add your Google API Key to the Streamlit Secrets.")
 
 
     pergunta_ia = st.sidebar.text_input("Ask a question about the recruitment data:")
