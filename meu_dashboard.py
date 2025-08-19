@@ -206,12 +206,28 @@ if df_plan is not None and not df_plan.empty:
 
     pergunta_ia = st.sidebar.text_input("Ask a question about the recruitment data:")
 
+    # Adicionamos um checkbox para ativar o modo de depuração
+    debug_mode = st.sidebar.checkbox("Show retrieved context (Debug Mode)")
+
     if st.sidebar.button("Get Answer"):
         if st.session_state.qa_chain and pergunta_ia:
             with st.spinner("Thinking..."):
+                
+                # --- MODO DE DEPURAÇÃO ---
+                if debug_mode:
+                    # Apenas recuperamos os documentos, sem chamar o LLM
+                    retriever = st.session_state.qa_chain.retriever
+                    retrieved_docs = retriever.invoke(pergunta_ia)
+                    
+                    st.sidebar.write("### Retrieved Context (Debug)")
+                    for i, doc in enumerate(retrieved_docs):
+                        st.sidebar.info(f"--- Document {i+1} ---\n{doc.page_content}")
+                # --- FIM DO MODO DE DEPURAÇÃO ---
+
                 resposta = st.session_state.qa_chain.invoke(pergunta_ia)
                 st.sidebar.write("### Answer")
                 st.sidebar.write(resposta["result"])
+
         elif st.session_state.qa_chain is None:
             st.sidebar.error("AI could not be initialized. Check the API key and file path.")
         else:
