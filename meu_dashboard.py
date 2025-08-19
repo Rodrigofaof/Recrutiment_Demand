@@ -175,7 +175,7 @@ if df_plan is not None and not df_plan.empty:
     if google_api_key and os.path.exists(ALLOC_FILE):
         if st.session_state.qa_chain is None:
             with st.spinner("Initializing AI..."):
-                embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
+                embeddings = GoogleGenerativeAIEmbeddings(model="text-embedding-004", google_api_key=google_api_key)
                 
                 if os.path.exists(FAISS_INDEX_PATH):
                     st.sidebar.info(f"Loading existing AI index from '{FAISS_INDEX_PATH}'...")
@@ -190,7 +190,7 @@ if df_plan is not None and not df_plan.empty:
                     vectorstore.save_local(FAISS_INDEX_PATH)
                     st.sidebar.info(f"New index saved to '{FAISS_INDEX_PATH}'.")
 
-                llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
+                llm = ChatGoogleGenerativeAI(model="gemini-1.0-pro", google_api_key=google_api_key, convert_system_message_to_human=True)
                 st.session_state.qa_chain = RetrievalQA.from_chain_type(
                     llm=llm,
                     chain_type="stuff",
