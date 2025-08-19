@@ -175,23 +175,49 @@ if df_plan is not None and not df_plan.empty:
     if google_api_key and os.path.exists(ALLOC_FILE):
         if st.session_state.qa_chain is None:
             with st.spinner("Initializing AI..."):
-                # NOME DO MODELO CORRIGIDO
+                
+                # --- ETAPA 1: Carregar o CSV com Pandas ---
+                st.sidebar.info(f"Reading data from '{ALLOC_FILE}' to teach the AI...")
+                df_ia_data = pd.read_csv(ALLOC_FILE)
+
+                # --- ETAPA 2: Transformar cada linha em um "Documento" com contexto ---
+                # Importa a classe Document que precisamos
+                from langchain.schema import Document
+
+                documentos = []
+                for index, row in df_ia_data.iterrows():
+                    # Para cada linha, criamos uma frase descritiva.
+                    # Isso dá o contexto que a IA precisa!
+                    conteudo = (
+                        f"For project ID {row.get('project_id', 'N/A')}, "
+                        f"in country {row.get('country', 'N/A')} "
+                        f"for the {row.get('age_group', 'N/A')} age group and gender {row.get('Gender', 'N/A')}, "
+                        f"the recruitment goal is {row.get('Pessoas_Para_Recrutar', 0)} people. "
+                        f"The number of completes allocated is {row.get('allocated_completes', 0)}. "
+                        f"The recruitment type is {row.get('Recruitment', 'N/A')} "
+                        f"for social class (SEL) {row.get('SEL', 'N/A')} in region {row.get('Region', 'N/A')}."
+                    )
+                    # Adicionamos metadados para referência
+                    metadata = {"source": ALLOC_FILE, "row": index}
+                    documentos.append(Document(page_content=conteudo, metadata=metadata))
+
+                st.sidebar.info(f"Created {len(documentos)} documents for the AI's knowledge base.")
+                
+                # --- ETAPA 3: Criar o índice a partir dos nossos documentos personalizados ---
                 embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=google_api_key)
                 
                 if os.path.exists(FAISS_INDEX_PATH):
                     st.sidebar.info(f"Loading existing AI index from '{FAISS_INDEX_PATH}'...")
+                    # NOTA: O índice antigo não serve mais, pois os documentos mudaram.
+                    # É melhor apagar a pasta 'faiss_index' para forçar a recriação.
                     vectorstore = FAISS.load_local(FAISS_INDEX_PATH, embeddings, allow_dangerous_deserialization=True)
                 else:
-                    st.sidebar.info(f"AI index not found. Creating a new one from '{ALLOC_FILE}'...")
-                    loader = CSVLoader(file_path=ALLOC_FILE, encoding='utf-8')
-                    documentos = loader.load()
-                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-                    textos = text_splitter.split_documents(documentos)
-                    vectorstore = FAISS.from_documents(textos, embeddings)
+                    st.sidebar.info(f"AI index not found. Creating a new one...")
+                    # Não precisamos mais do TextSplitter, pois nossos documentos já são pequenos e com contexto
+                    vectorstore = FAISS.from_documents(documentos, embeddings)
                     vectorstore.save_local(FAISS_INDEX_PATH)
                     st.sidebar.info(f"New index saved to '{FAISS_INDEX_PATH}'.")
 
-                # NOME DO MODELO CORRIGIDO
                 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=google_api_key, convert_system_message_to_human=True)
                 
                 st.session_state.qa_chain = RetrievalQA.from_chain_type(
@@ -200,6 +226,7 @@ if df_plan is not None and not df_plan.empty:
                     retriever=vectorstore.as_retriever()
                 )
                 st.sidebar.success("AI is ready!")
+
     elif not google_api_key:
         st.sidebar.warning("Please add your Google API Key to the Streamlit Secrets.")
 
