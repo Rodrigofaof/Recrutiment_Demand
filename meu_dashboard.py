@@ -82,7 +82,6 @@ def generate_plan(_df_alloc):
 
 @st.cache_resource
 def get_qa_chain(_df_report, api_key):
-    st.info("Inicializando o assistente de IA...")
     docs = []
     for index, row in _df_report.iterrows():
         content = ", ".join([f"{col}: {val}" for col, val in row.astype(str).items()])
@@ -101,7 +100,6 @@ def get_qa_chain(_df_report, api_key):
         chain_type="stuff",
         retriever=retriever
     )
-    st.success("Assistente de IA pronto!")
     return chain
 
 df_alloc_original, df_projects_original, df_report = load_data(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
