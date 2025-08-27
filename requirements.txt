@@ -8,3 +8,4 @@ google-generativeai
 faiss-cpu
 tiktoken
 openpyxl
+tabulate
