@@ -4,10 +4,10 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
-from langchain.schema import Document
-from langchain_community.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain.chains import RetrievalQA
+
+# --- Importações para a IA com Pandas Agent ---
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 
 st.set_page_config(layout="wide")
 
@@ -81,26 +81,16 @@ def generate_plan(_df_alloc):
     return df_daily_plan_processed
 
 @st.cache_resource
-def get_qa_chain(_df_report, api_key):
-    docs = []
-    for index, row in _df_report.iterrows():
-        content = ", ".join([f"{col}: {val}" for col, val in row.astype(str).items()])
-        docs.append(Document(page_content=content, metadata={"source": REPORT_FILE, "row": index}))
-    
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
-    
-    vectorstore = FAISS.from_documents(docs, embeddings)
-    
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, convert_system_message_to_human=True)
-    
-    retriever = vectorstore.as_retriever(search_kwargs={'k': 20})
-    
-    chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever
+def get_pandas_agent(_df_report, api_key):
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
+    # Aqui criamos o agente que sabe usar o Pandas
+    agent = create_pandas_dataframe_agent(
+        llm,
+        _df_report,
+        verbose=True, # Permite ver o "raciocínio" do agente no terminal
+        agent_executor_kwargs={"handle_parsing_errors": True} # Ajuda a lidar com erros
     )
-    return chain
+    return agent
 
 df_alloc_original, df_projects_original, df_report = load_data(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
 
@@ -117,7 +107,8 @@ with tab_ia:
     if not google_api_key:
         st.error("Chave da API do Google não encontrada. Adicione a variável GOOGLE_API_KEY aos seus secrets do Streamlit.")
     elif df_report is not None:
-        qa_chain = get_qa_chain(df_report, google_api_key)
+        # Renomeamos para 'agent' para ficar mais claro
+        agent = get_pandas_agent(df_report, google_api_key)
         
         if "messages" not in st.session_state:
             st.session_state.messages = [{"role": "assistant", "content": "How can I help?"}]
@@ -132,10 +123,12 @@ with tab_ia:
                 st.markdown(prompt)
 
             with st.chat_message("assistant"):
-                with st.spinner("Pensando..."):
-                    response = qa_chain.invoke(prompt)
-                    st.markdown(response["result"])
-            st.session_state.messages.append({"role": "assistant", "content": response["result"]})
+                with st.spinner("Analyzing data..."):
+                    # Usamos o agente para invocar a resposta
+                    response = agent.invoke(prompt)
+                    # A resposta do agente vem na chave 'output'
+                    st.markdown(response["output"])
+            st.session_state.messages.append({"role": "assistant", "content": response["output"]})
     else:
         st.warning("Não foi possível carregar o arquivo de relatório para alimentar o assistente de IA.")
 
