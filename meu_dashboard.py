@@ -81,7 +81,7 @@ def generate_plan(_df_alloc):
 
 @st.cache_resource
 def get_pandas_agent(_df_report, api_key):
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=api_key, temperature=0)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
     
     # Pega a data de hoje e formata
     today_date_str = date.today().strftime('%Y-%m-%d')
