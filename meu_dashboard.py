@@ -91,7 +91,7 @@ def get_qa_chain(_df_report, api_key):
     
     vectorstore = FAISS.from_documents(docs, embeddings)
     
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, convert_system_message_to_human=True)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, convert_system_message_to_human=True)
     
     retriever = vectorstore.as_retriever(search_kwargs={'k': 20})
     
@@ -113,20 +113,20 @@ if df_alloc_original is not None:
 tab_ia, tab_charts, tab_tables = st.tabs(["AI Assistant", "Demand Charts", "Data Tables"])
 
 with tab_ia:
-    st.header("Pergunte sobre o Relatório de Recrutamento")
+    st.header("Ask about the recruitment Data")
     if not google_api_key:
         st.error("Chave da API do Google não encontrada. Adicione a variável GOOGLE_API_KEY aos seus secrets do Streamlit.")
     elif df_report is not None:
         qa_chain = get_qa_chain(df_report, google_api_key)
         
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "Olá! Como posso ajudar com os dados do relatório?"}]
+            st.session_state.messages = [{"role": "assistant", "content": "How can I help?"}]
 
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
-        if prompt := st.chat_input("O que você gostaria de saber sobre o relatório?"):
+        if prompt := st.chat_input("What would you like to know?"):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
