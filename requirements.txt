@@ -9,3 +9,4 @@ faiss-cpu
 tiktoken
 openpyxl
 tabulate
+langchain_experimental
