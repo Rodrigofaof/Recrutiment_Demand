@@ -83,6 +83,9 @@ def generate_plan(_df_alloc):
 def get_pandas_agent(_df_report, api_key):
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=api_key, temperature=0)
     
+    # Pega a data de hoje e formata
+    today_date_str = date.today().strftime('%Y-%m-%d')
+
     agent = create_pandas_dataframe_agent(
         llm,
         _df_report,
@@ -90,13 +93,17 @@ def get_pandas_agent(_df_report, api_key):
         verbose=True,
         agent_executor_kwargs={"handle_parsing_errors": True},
         allow_dangerous_code=True,
-        prefix="""
+        # O prefixo agora é uma f-string que inclui a data
+        prefix=f"""
         Você é um assistente de análise de dados especialista em pandas. Sua tarefa é ajudar os usuários a responder perguntas sobre um DataFrame.
         - Antes de responder, SEMPRE pense passo a passo no seu plano de ação.
         - Verifique cuidadosamente os nomes das colunas no DataFrame antes de escrever qualquer código. Os nomes são sensíveis a maiúsculas e minúsculas.
         - Se precisar fazer um cálculo, escreva o código pandas para isso.
         - Ao dar a resposta final, explique brevemente como você chegou a ela.
         - Se a pergunta for ambígua, peça esclarecimentos.
+        - Na coluna Age temos uma string, o primeiro número é referente a idade inicial do Range e o segundo a idade final do Range
+        - Na coluna Expected Date você deve interpretar a data como yyyy-mm-dd
+        - Hoje é {today_date_str}
         """
     )
     return agent
@@ -171,7 +178,6 @@ if df_plan is not None and not df_plan.empty:
         if col in df_filtered.columns:
             options = sorted(df_filtered[col].dropna().unique())
             if options:
-                # Lógica para definir o valor padrão do filtro de Recrutamento
                 if col == 'Recruitment':
                     default_value = ['Yes'] if 'Yes' in options else []
                     selected = st.sidebar.multiselect(label, options, default=default_value)
