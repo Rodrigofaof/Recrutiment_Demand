@@ -6,6 +6,7 @@ import ast
 from datetime import date, timedelta
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
+from langchain.agents.agent_types import AgentType
 
 st.set_page_config(layout="wide")
 
@@ -80,13 +81,23 @@ def generate_plan(_df_alloc):
 
 @st.cache_resource
 def get_pandas_agent(_df_report, api_key):
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=api_key, temperature=0)
+    
     agent = create_pandas_dataframe_agent(
         llm,
         _df_report,
+        agent_type=AgentType.OPENAI_FUNCTIONS,
         verbose=True,
         agent_executor_kwargs={"handle_parsing_errors": True},
-        allow_dangerous_code=True  # <-- CORREÇÃO APLICADA AQUI
+        allow_dangerous_code=True,
+        prefix="""
+        Você é um assistente de análise de dados especialista em pandas. Sua tarefa é ajudar os usuários a responder perguntas sobre um DataFrame.
+        - Antes de responder, SEMPRE pense passo a passo no seu plano de ação.
+        - Verifique cuidadosamente os nomes das colunas no DataFrame antes de escrever qualquer código. Os nomes são sensíveis a maiúsculas e minúsculas.
+        - Se precisar fazer um cálculo, escreva o código pandas para isso.
+        - Ao dar a resposta final, explique brevemente como você chegou a ela.
+        - Se a pergunta for ambígua, peça esclarecimentos.
+        """
     )
     return agent
 
@@ -108,7 +119,7 @@ with tab_ia:
         agent = get_pandas_agent(df_report, google_api_key)
         
         if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "How can I help?"}]
+            st.session_state.messages = [{"role": "assistant", "content": "How can I help you analyze the recruitment report?"}]
 
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
@@ -121,9 +132,13 @@ with tab_ia:
 
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing data..."):
-                    response = agent.invoke(prompt)
-                    st.markdown(response["output"])
-            st.session_state.messages.append({"role": "assistant", "content": response["output"]})
+                    try:
+                        response = agent.invoke(prompt)
+                        answer = response.get("output", "Não consegui processar a resposta.")
+                    except Exception as e:
+                        answer = f"Ocorreu um erro: {e}"
+                    st.markdown(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
     else:
         st.warning("Não foi possível carregar o arquivo de relatório para alimentar o assistente de IA.")
 
@@ -156,7 +171,13 @@ if df_plan is not None and not df_plan.empty:
         if col in df_filtered.columns:
             options = sorted(df_filtered[col].dropna().unique())
             if options:
-                selected = st.sidebar.multiselect(label, options)
+                # Lógica para definir o valor padrão do filtro de Recrutamento
+                if col == 'Recruitment':
+                    default_value = ['Yes'] if 'Yes' in options else []
+                    selected = st.sidebar.multiselect(label, options, default=default_value)
+                else:
+                    selected = st.sidebar.multiselect(label, options)
+
                 if selected:
                     df_filtered = df_filtered[df_filtered[col].isin(selected)]
                     if not df_projects_filtered.empty and col in df_projects_filtered.columns:
