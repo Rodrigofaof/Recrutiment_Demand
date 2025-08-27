@@ -103,6 +103,7 @@ def get_pandas_agent(_df_report, api_key):
         - Se a pergunta for ambígua, peça esclarecimentos.
         - Na coluna Age temos uma string, o primeiro número é referente a idade inicial do Range e o segundo a idade final do Range
         - Na coluna Expected Date você deve interpretar a data como yyyy-mm-dd
+        - Quando for perguntado sobre hoje, sempre some tudo que está para trás
         - Hoje é {today_date_str}
         """
     )
