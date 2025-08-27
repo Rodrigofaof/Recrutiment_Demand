@@ -15,79 +15,14 @@ ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 REPORT_FILE = 'Report.xlsx'
 
-# --- Gemini API Call Function ---
-def call_gemini_api(messages, report_data):
-    system_prompt = f"""
-    You are a specialized data analyst assistant. Your task is to answer questions based ONLY on the data provided from the 'Report.xlsx' file.
-    Do not make assumptions or use external knowledge. If the answer cannot be found in the provided data, state that clearly.
-    Here is the report data in markdown format:
-    ---
-    {report_data}
-    ---
-    """
-    
-    # We only need the last user message for the API call content
-    user_query = ""
-    if messages and messages[-1]['role'] == 'user':
-        user_query = messages[-1]['content']
-
-    payload = {
-        "contents": [{"parts": [{"text": user_query}]}],
-        "systemInstruction": {
-            "parts": [{"text": system_prompt}]
-        },
-    }
-
-    # This component will run the JavaScript to call the API
-    # and will use a callback to return the result to Streamlit
-    components.html(
-        f"""
-        <script>
-        async function callApi() {{
-            const apiKey = ""; 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            
-            const payload = {json.dumps(payload)};
-
-            try {{
-                const response = await fetch(url, {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify(payload)
-                }});
-                const result = await response.json();
-                
-                let text = "Sorry, I could not process the response.";
-                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {{
-                   text = result.candidates[0].content.parts[0].text;
-                }}
-                
-                window.parent.postMessage({{
-                    'type': 'streamlit:setComponentValue',
-                    'value': {{'type': 'ai_response', 'text': text}}
-                }}, '*');
-
-            }} catch (error) {{
-                console.error('Error calling Gemini API:', error);
-                window.parent.postMessage({{
-                    'type': 'streamlit:setComponentValue',
-                    'value': {{'type': 'ai_response', 'text': 'An error occurred while contacting the AI model.'}}
-                }}, '*');
-            }}
-        }}
-        callApi();
-        </script>
-        """,
-        height=0,
-        width=0,
-    )
-
+# Pega a chave da API dos secrets do Streamlit
+google_api_key = st.secrets.get("GOOGLE_API_KEY")
 
 @st.cache_data
 def load_data(alloc_path, projects_path, report_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path) or not os.path.exists(report_path):
         st.error(f"ERROR: Files not found. Check for '{alloc_path}', '{projects_path}', and '{report_path}'.")
-        return None, None, None, None
+        return None, None, None
 
     df_alloc = pd.read_csv(alloc_path)
     df_projects = pd.read_csv(projects_path)
@@ -175,7 +110,9 @@ tab_ia, tab_charts, tab_tables = st.tabs(["AI Assistant", "Demand Charts", "Data
 with tab_ia:
     st.header("Ask About the Recruitment Report")
     
-    if df_report is not None:
+    if not google_api_key:
+        st.error("Chave da API do Google não encontrada. Adicione a variável GOOGLE_API_KEY aos seus secrets do Streamlit.")
+    elif df_report is not None:
         report_markdown = df_report.to_markdown(index=False)
 
         if "messages" not in st.session_state:
@@ -184,24 +121,77 @@ with tab_ia:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
+        
+        # Este componente invisível vai receber a resposta da API
+        api_response = components.html("<div id='response'></div>", height=0)
+
+        if api_response and api_response.get('type') == 'ai_response':
+            response_text = api_response['text']
+            # Evita adicionar respostas duplicadas
+            if st.session_state.messages[-1]['role'] != 'assistant':
+                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                st.rerun()
 
         if prompt := st.chat_input("What would you like to know about the report?"):
             st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+            
+            system_prompt = f"""
+            You are a specialized data analyst assistant. Your task is to answer questions based ONLY on the data provided from the 'Report.xlsx' file.
+            Do not make assumptions or use external knowledge. If the answer cannot be found in the provided data, state that clearly.
+            Here is the report data in markdown format:
+            ---
+            {report_markdown}
+            ---
+            """
+            
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "systemInstruction": {"parts": [{"text": system_prompt}]},
+            }
 
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    # The call_gemini_api function will render an HTML component
-                    # that calls the API and sets the result in st.session_state
-                    # via a component value callback.
-                    component_value = call_gemini_api(st.session_state.messages, report_markdown)
+            components.html(
+                f"""
+                <script>
+                async function callApi() {{
+                    // A chave da API é injetada aqui pelo Python
+                    const apiKey = "{google_api_key}"; 
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${{apiKey}}`;
                     
-                    # We don't have a direct return, so we rely on the component to set a value
-                    # and then we can check for it. This part is tricky with st.components.v1.html
-                    # A more robust solution might use a custom component or a different architecture,
-                    # but this is a workaround. For now, we'll just show the spinner and the user
-                    # will see the response appear after the API call finishes.
+                    const payload = {json.dumps(payload)};
+
+                    try {{
+                        const response = await fetch(url, {{
+                            method: 'POST',
+                            headers: {{ 'Content-Type': 'application/json' }},
+                            body: JSON.stringify(payload)
+                        }});
+                        const result = await response.json();
+                        
+                        let text = "Sorry, I could not process the response.";
+                        if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {{
+                           text = result.candidates[0].content.parts[0].text;
+                        }}
+                        
+                        // Envia a resposta de volta para o Streamlit
+                        window.parent.postMessage({{
+                            'type': 'streamlit:setComponentValue',
+                            'value': {{'type': 'ai_response', 'text': text}}
+                        }}, '*');
+
+                    }} catch (error) {{
+                        console.error('Error calling Gemini API:', error);
+                        window.parent.postMessage({{
+                            'type': 'streamlit:setComponentValue',
+                            'value': {{'type': 'ai_response', 'text': 'An error occurred while contacting the AI model.'}}
+                        }}, '*');
+                    }}
+                }}
+                callApi();
+                </script>
+                """,
+                height=0,
+            )
+            st.rerun()
 
     else:
         st.warning("Could not load the report file to power the AI assistant.")
@@ -252,7 +242,7 @@ if df_plan is not None and not df_plan.empty:
 
     if 'Recruitment' in df_filtered.columns:
         all_recruitment_options = sorted(df_filtered['Recruitment'].dropna().unique())
-        selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
+        selected_recruitment = st.sidebar.multiselet('4. Recruitment', all_recruitment_options)
         if selected_recruitment:
             df_filtered = df_filtered[df_filtered['Recruitment'].isin(selected_recruitment)]
             if not df_projects_filtered.empty and 'Recruitment' in df_projects_filtered.columns:
