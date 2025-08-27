@@ -22,7 +22,8 @@ REPORT_FILE = 'Report.xlsx'
 FAISS_INDEX_PATH = "faiss_index_report" # Caminho para o índice da IA do relatório
 
 # --- Acesso à Chave da API ---
-google_api_key = st.secrets.get("GOOGLE_API_KEY")
+# Linha correta
+google_api_key = st.secrets["GOOGLE_API_KEY"] if "GOOGLE_API_KEY" in st.secrets else None
 
 # --- Funções de Carregamento e Processamento de Dados ---
 @st.cache_data
