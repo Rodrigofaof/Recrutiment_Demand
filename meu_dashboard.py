@@ -11,15 +11,17 @@ st.title("Dynamic Recruitment Dashboard")
 
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
+REPORT_FILE = 'Report.xlsx' # Novo arquivo
 
 @st.cache_data
-def load_and_generate_plan(alloc_path, projects_path):
-    if not os.path.exists(alloc_path) or not os.path.exists(projects_path):
-        st.error(f"ERROR: Files not found. Check for '{alloc_path}' and '{projects_path}'.")
-        return None, None, None
+def load_and_generate_plan(alloc_path, projects_path, report_path):
+    if not os.path.exists(alloc_path) or not os.path.exists(projects_path) or not os.path.exists(report_path):
+        st.error(f"ERROR: Files not found. Check for '{alloc_path}', '{projects_path}', and '{report_path}'.")
+        return None, None, None, None
 
     df_alloc = pd.read_csv(alloc_path)
     df_projects = pd.read_csv(projects_path)
+    df_report = pd.read_excel(report_path) # Carrega o arquivo Excel
 
     today = date.today()
     daily_plan = []
@@ -56,7 +58,7 @@ def load_and_generate_plan(alloc_path, projects_path):
 
     if not daily_plan:
         st.warning("Could not generate a daily recruitment plan. Check input data.")
-        return df_alloc, df_projects, pd.DataFrame()
+        return df_alloc, df_projects, pd.DataFrame(), df_report
 
     df_daily_plan = pd.DataFrame(daily_plan)
     df_daily_plan['plan_date'] = pd.to_datetime(df_daily_plan['plan_date']).dt.date
@@ -83,9 +85,9 @@ def load_and_generate_plan(alloc_path, projects_path):
     df_daily_plan_processed['project_id'] = df_daily_plan_processed['project_id'].astype(str)
     df_projects['project_id'] = df_projects['project_id'].astype(str)
 
-    return df_alloc, df_projects, df_daily_plan_processed
+    return df_alloc, df_projects, df_daily_plan_processed, df_report
 
-df_alloc_original, df_projects_original, df_plan = load_and_generate_plan(ALLOC_FILE, PROJECTS_FILE)
+df_alloc_original, df_projects_original, df_plan, df_report = load_and_generate_plan(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
 
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filters")
@@ -129,7 +131,6 @@ if df_plan is not None and not df_plan.empty:
         if 'country' in df_projects_filtered.columns:
              df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
-    # --- NOVO FILTRO DE RECRUTAMENTO ---
     if 'Recruitment' in df_filtered.columns:
         all_recruitment_options = sorted(df_filtered['Recruitment'].dropna().unique())
         selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
@@ -206,6 +207,11 @@ if df_plan is not None and not df_plan.empty:
                 st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tables:
+        # Nova tabela adicionada aqui
+        if df_report is not None:
+            st.header("Recruitment Report Data")
+            st.dataframe(df_report)
+        
         st.header("Detailed Recruitment Plan")
         display_cols = ['plan_date', 'daily_recruitment_goal', 'daily_allocated_goal', 'project_id', 'country', 'Recruitment', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
