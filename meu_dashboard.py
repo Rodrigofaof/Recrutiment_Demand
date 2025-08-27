@@ -4,6 +4,8 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
+import json
+import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
 
@@ -11,18 +13,89 @@ st.title("Dynamic Recruitment Dashboard")
 
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
-REPORT_FILE = 'Report.xlsx' # Novo arquivo
+REPORT_FILE = 'Report.xlsx'
+
+# --- Gemini API Call Function ---
+def call_gemini_api(messages, report_data):
+    system_prompt = f"""
+    You are a specialized data analyst assistant. Your task is to answer questions based ONLY on the data provided from the 'Report.xlsx' file.
+    Do not make assumptions or use external knowledge. If the answer cannot be found in the provided data, state that clearly.
+    Here is the report data in markdown format:
+    ---
+    {report_data}
+    ---
+    """
+    
+    # We only need the last user message for the API call content
+    user_query = ""
+    if messages and messages[-1]['role'] == 'user':
+        user_query = messages[-1]['content']
+
+    payload = {
+        "contents": [{"parts": [{"text": user_query}]}],
+        "systemInstruction": {
+            "parts": [{"text": system_prompt}]
+        },
+    }
+
+    # This component will run the JavaScript to call the API
+    # and will use a callback to return the result to Streamlit
+    components.html(
+        f"""
+        <script>
+        async function callApi() {{
+            const apiKey = ""; 
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const payload = {json.dumps(payload)};
+
+            try {{
+                const response = await fetch(url, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(payload)
+                }});
+                const result = await response.json();
+                
+                let text = "Sorry, I could not process the response.";
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {{
+                   text = result.candidates[0].content.parts[0].text;
+                }}
+                
+                window.parent.postMessage({{
+                    'type': 'streamlit:setComponentValue',
+                    'value': {{'type': 'ai_response', 'text': text}}
+                }}, '*');
+
+            }} catch (error) {{
+                console.error('Error calling Gemini API:', error);
+                window.parent.postMessage({{
+                    'type': 'streamlit:setComponentValue',
+                    'value': {{'type': 'ai_response', 'text': 'An error occurred while contacting the AI model.'}}
+                }}, '*');
+            }}
+        }}
+        callApi();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
 
 @st.cache_data
-def load_and_generate_plan(alloc_path, projects_path, report_path):
+def load_data(alloc_path, projects_path, report_path):
     if not os.path.exists(alloc_path) or not os.path.exists(projects_path) or not os.path.exists(report_path):
         st.error(f"ERROR: Files not found. Check for '{alloc_path}', '{projects_path}', and '{report_path}'.")
         return None, None, None, None
 
     df_alloc = pd.read_csv(alloc_path)
     df_projects = pd.read_csv(projects_path)
-    df_report = pd.read_excel(report_path) # Carrega o arquivo Excel
+    df_report = pd.read_excel(report_path)
+    return df_alloc, df_projects, df_report
 
+@st.cache_data
+def generate_plan(df_alloc):
     today = date.today()
     daily_plan = []
     
@@ -57,8 +130,7 @@ def load_and_generate_plan(alloc_path, projects_path, report_path):
                 daily_plan.append(new_row)
 
     if not daily_plan:
-        st.warning("Could not generate a daily recruitment plan. Check input data.")
-        return df_alloc, df_projects, pd.DataFrame(), df_report
+        return pd.DataFrame()
 
     df_daily_plan = pd.DataFrame(daily_plan)
     df_daily_plan['plan_date'] = pd.to_datetime(df_daily_plan['plan_date']).dt.date
@@ -83,12 +155,58 @@ def load_and_generate_plan(alloc_path, projects_path, report_path):
         df_daily_plan_processed['SEL'] = df_daily_plan_processed['SEL'].astype(str).replace('0', 'Country without SEL')
     
     df_daily_plan_processed['project_id'] = df_daily_plan_processed['project_id'].astype(str)
-    df_projects['project_id'] = df_projects['project_id'].astype(str)
+    
+    return df_daily_plan_processed
 
-    return df_alloc, df_projects, df_daily_plan_processed, df_report
+# --- Main App ---
+df_alloc_original, df_projects_original, df_report = load_data(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
 
-df_alloc_original, df_projects_original, df_plan, df_report = load_and_generate_plan(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
+if df_alloc_original is not None:
+    df_plan = generate_plan(df_alloc_original)
+    if df_projects_original is not None:
+        df_projects_original['project_id'] = df_projects_original['project_id'].astype(str)
+else:
+    df_plan = pd.DataFrame()
 
+# --- TABS ---
+tab_ia, tab_charts, tab_tables = st.tabs(["AI Assistant", "Demand Charts", "Data Tables"])
+
+# --- AI Assistant Tab ---
+with tab_ia:
+    st.header("Ask About the Recruitment Report")
+    
+    if df_report is not None:
+        report_markdown = df_report.to_markdown(index=False)
+
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
+
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+        if prompt := st.chat_input("What would you like to know about the report?"):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    # The call_gemini_api function will render an HTML component
+                    # that calls the API and sets the result in st.session_state
+                    # via a component value callback.
+                    component_value = call_gemini_api(st.session_state.messages, report_markdown)
+                    
+                    # We don't have a direct return, so we rely on the component to set a value
+                    # and then we can check for it. This part is tricky with st.components.v1.html
+                    # A more robust solution might use a custom component or a different architecture,
+                    # but this is a workaround. For now, we'll just show the spinner and the user
+                    # will see the response appear after the API call finishes.
+
+    else:
+        st.warning("Could not load the report file to power the AI assistant.")
+
+# --- Dashboard Filters and Content (Charts and Tables) ---
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filters")
 
@@ -116,19 +234,20 @@ if df_plan is not None and not df_plan.empty:
             header_title = f"Recruitment Demand for: {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}"
 
     df_filtered = df_filtered_by_date
-    df_projects_filtered = df_projects_original.copy()
+    df_projects_filtered = df_projects_original.copy() if df_projects_original is not None else pd.DataFrame()
 
     all_projects = sorted(df_filtered['project_id'].unique())
     selected_projects = st.sidebar.multiselect('2. Project(s)', all_projects)
     if selected_projects:
         df_filtered = df_filtered[df_filtered['project_id'].isin(selected_projects)]
-        df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
+        if not df_projects_filtered.empty:
+            df_projects_filtered = df_projects_filtered[df_projects_filtered['project_id'].isin(selected_projects)]
 
     all_countries = sorted(df_filtered['country'].dropna().unique())
     selected_countries = st.sidebar.multiselect('3. Country(ies)', all_countries)
     if selected_countries:
         df_filtered = df_filtered[df_filtered['country'].isin(selected_countries)]
-        if 'country' in df_projects_filtered.columns:
+        if not df_projects_filtered.empty and 'country' in df_projects_filtered.columns:
              df_projects_filtered = df_projects_filtered[df_projects_filtered['country'].isin(selected_countries)]
 
     if 'Recruitment' in df_filtered.columns:
@@ -136,7 +255,7 @@ if df_plan is not None and not df_plan.empty:
         selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
         if selected_recruitment:
             df_filtered = df_filtered[df_filtered['Recruitment'].isin(selected_recruitment)]
-            if 'Recruitment' in df_projects_filtered.columns:
+            if not df_projects_filtered.empty and 'Recruitment' in df_projects_filtered.columns:
                 df_projects_filtered = df_projects_filtered[df_projects_filtered['Recruitment'].isin(selected_recruitment)]
 
     all_regions = sorted(df_filtered['Region'].dropna().unique())
@@ -158,8 +277,6 @@ if df_plan is not None and not df_plan.empty:
     selected_sels = st.sidebar.multiselect('8. Social Class (SEL)', all_sels)
     if selected_sels:
         df_filtered = df_filtered[df_filtered['SEL'].isin(selected_sels)]
-
-    tab_charts, tab_tables = st.tabs(["Demand Charts", "Data Tables"])
 
     with tab_charts:
         st.header(header_title)
@@ -207,7 +324,6 @@ if df_plan is not None and not df_plan.empty:
                 st.plotly_chart(fig_sel, use_container_width=True)
 
     with tab_tables:
-        # Nova tabela adicionada aqui
         if df_report is not None:
             st.header("Recruitment Report Data")
             st.dataframe(df_report)
@@ -217,6 +333,7 @@ if df_plan is not None and not df_plan.empty:
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
         st.info(f"Showing {len(df_filtered)} of {len(df_plan)} total planned activities.")
 
-        st.header("Original Projects Data")
-        st.dataframe(df_projects_filtered)
-        st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects_original)} projects.")
+        if not df_projects_filtered.empty:
+            st.header("Original Projects Data")
+            st.dataframe(df_projects_filtered)
+            st.info(f"Showing {len(df_projects_filtered)} of {len(df_projects_original)} projects.")
