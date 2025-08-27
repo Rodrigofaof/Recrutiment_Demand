@@ -4,8 +4,6 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
-
-# --- Importações para a IA com Pandas Agent ---
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
 
@@ -83,12 +81,12 @@ def generate_plan(_df_alloc):
 @st.cache_resource
 def get_pandas_agent(_df_report, api_key):
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key)
-    # Aqui criamos o agente que sabe usar o Pandas
     agent = create_pandas_dataframe_agent(
         llm,
         _df_report,
-        verbose=True, # Permite ver o "raciocínio" do agente no terminal
-        agent_executor_kwargs={"handle_parsing_errors": True} # Ajuda a lidar com erros
+        verbose=True,
+        agent_executor_kwargs={"handle_parsing_errors": True},
+        allow_dangerous_code=True  # <-- CORREÇÃO APLICADA AQUI
     )
     return agent
 
@@ -107,7 +105,6 @@ with tab_ia:
     if not google_api_key:
         st.error("Chave da API do Google não encontrada. Adicione a variável GOOGLE_API_KEY aos seus secrets do Streamlit.")
     elif df_report is not None:
-        # Renomeamos para 'agent' para ficar mais claro
         agent = get_pandas_agent(df_report, google_api_key)
         
         if "messages" not in st.session_state:
@@ -124,9 +121,7 @@ with tab_ia:
 
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing data..."):
-                    # Usamos o agente para invocar a resposta
                     response = agent.invoke(prompt)
-                    # A resposta do agente vem na chave 'output'
                     st.markdown(response["output"])
             st.session_state.messages.append({"role": "assistant", "content": response["output"]})
     else:
