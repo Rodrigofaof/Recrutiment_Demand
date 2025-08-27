@@ -4,8 +4,6 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
-
-# --- Importações para a IA com Langchain ---
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -15,17 +13,12 @@ st.set_page_config(layout="wide")
 
 st.title("Dynamic Recruitment Dashboard")
 
-# --- Constantes de Arquivos ---
 ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 REPORT_FILE = 'Report.xlsx'
-FAISS_INDEX_PATH = "faiss_index_report" # Caminho para o índice da IA do relatório
 
-# --- Acesso à Chave da API ---
-# Linha correta
 google_api_key = st.secrets["GOOGLE_API_KEY"] if "GOOGLE_API_KEY" in st.secrets else None
 
-# --- Funções de Carregamento e Processamento de Dados ---
 @st.cache_data
 def load_data(alloc_path, projects_path, report_path):
     if not all(os.path.exists(p) for p in [alloc_path, projects_path, report_path]):
@@ -87,7 +80,6 @@ def generate_plan(_df_alloc):
     df_daily_plan_processed['project_id'] = df_daily_plan_processed['project_id'].astype(str)
     return df_daily_plan_processed
 
-# --- Função para Inicializar a IA ---
 @st.cache_resource
 def get_qa_chain(_df_report, api_key):
     st.info("Inicializando o assistente de IA...")
@@ -96,21 +88,22 @@ def get_qa_chain(_df_report, api_key):
         content = ", ".join([f"{col}: {val}" for col, val in row.astype(str).items()])
         docs.append(Document(page_content=content, metadata={"source": REPORT_FILE, "row": index}))
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004", google_api_key=api_key)
     
     vectorstore = FAISS.from_documents(docs, embeddings)
     
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, convert_system_message_to_human=True)
     
+    retriever = vectorstore.as_retriever(search_kwargs={'k': 20})
+    
     chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever()
+        retriever=retriever
     )
     st.success("Assistente de IA pronto!")
     return chain
 
-# --- Carregamento Principal ---
 df_alloc_original, df_projects_original, df_report = load_data(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
 
 df_plan = pd.DataFrame()
@@ -119,7 +112,6 @@ if df_alloc_original is not None:
     if df_projects_original is not None:
         df_projects_original['project_id'] = df_projects_original['project_id'].astype(str)
 
-# --- Interface do Dashboard ---
 tab_ia, tab_charts, tab_tables = st.tabs(["AI Assistant", "Demand Charts", "Data Tables"])
 
 with tab_ia:
@@ -130,7 +122,7 @@ with tab_ia:
         qa_chain = get_qa_chain(df_report, google_api_key)
         
         if "messages" not in st.session_state:
-            st.session_state.messages = []
+            st.session_state.messages = [{"role": "assistant", "content": "Olá! Como posso ajudar com os dados do relatório?"}]
 
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
@@ -149,7 +141,6 @@ with tab_ia:
     else:
         st.warning("Não foi possível carregar o arquivo de relatório para alimentar o assistente de IA.")
 
-# --- Lógica dos Filtros e Gráficos ---
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filtros")
     use_date_filter = st.sidebar.checkbox("Filtrar por período")
