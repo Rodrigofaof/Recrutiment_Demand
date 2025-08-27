@@ -15,8 +15,7 @@ ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 REPORT_FILE = 'Report.xlsx'
 
-# Pega a chave da API dos secrets do Streamlit
-google_api_key = st.secrets.get("GOOGLE_API_KEY")
+google_api_key = st.secrets["GOOGLE_API_KEY"] if "GOOGLE_API_KEY" in st.secrets else None
 
 @st.cache_data
 def load_data(alloc_path, projects_path, report_path):
@@ -93,7 +92,6 @@ def generate_plan(df_alloc):
     
     return df_daily_plan_processed
 
-# --- Main App ---
 df_alloc_original, df_projects_original, df_report = load_data(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
 
 if df_alloc_original is not None:
@@ -103,10 +101,8 @@ if df_alloc_original is not None:
 else:
     df_plan = pd.DataFrame()
 
-# --- TABS ---
 tab_ia, tab_charts, tab_tables = st.tabs(["AI Assistant", "Demand Charts", "Data Tables"])
 
-# --- AI Assistant Tab ---
 with tab_ia:
     st.header("Ask About the Recruitment Report")
     
@@ -122,12 +118,10 @@ with tab_ia:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
-        # Este componente invisível vai receber a resposta da API
         api_response = components.html("<div id='response'></div>", height=0)
 
         if api_response and api_response.get('type') == 'ai_response':
             response_text = api_response['text']
-            # Evita adicionar respostas duplicadas
             if st.session_state.messages[-1]['role'] != 'assistant':
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
                 st.rerun()
@@ -153,7 +147,6 @@ with tab_ia:
                 f"""
                 <script>
                 async function callApi() {{
-                    // A chave da API é injetada aqui pelo Python
                     const apiKey = "{google_api_key}"; 
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${{apiKey}}`;
                     
@@ -172,7 +165,6 @@ with tab_ia:
                            text = result.candidates[0].content.parts[0].text;
                         }}
                         
-                        // Envia a resposta de volta para o Streamlit
                         window.parent.postMessage({{
                             'type': 'streamlit:setComponentValue',
                             'value': {{'type': 'ai_response', 'text': text}}
@@ -196,7 +188,6 @@ with tab_ia:
     else:
         st.warning("Could not load the report file to power the AI assistant.")
 
-# --- Dashboard Filters and Content (Charts and Tables) ---
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filters")
 
@@ -242,7 +233,7 @@ if df_plan is not None and not df_plan.empty:
 
     if 'Recruitment' in df_filtered.columns:
         all_recruitment_options = sorted(df_filtered['Recruitment'].dropna().unique())
-        selected_recruitment = st.sidebar.multiselet('4. Recruitment', all_recruitment_options)
+        selected_recruitment = st.sidebar.multiselect('4. Recruitment', all_recruitment_options)
         if selected_recruitment:
             df_filtered = df_filtered[df_filtered['Recruitment'].isin(selected_recruitment)]
             if not df_projects_filtered.empty and 'Recruitment' in df_projects_filtered.columns:
