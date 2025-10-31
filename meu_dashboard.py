@@ -1,3 +1,4 @@
+%%writefile /home/offerwise/Recrutiment_Demand/meu_dashboard.py
 import streamlit as st
 import pandas as pd
 import os
@@ -83,7 +84,6 @@ def generate_plan(_df_alloc):
 def get_pandas_agent(_df_report, api_key):
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
     
-    # Pega a data de hoje e formata
     today_date_str = date.today().strftime('%Y-%m-%d')
 
     agent = create_pandas_dataframe_agent(
@@ -93,9 +93,8 @@ def get_pandas_agent(_df_report, api_key):
         verbose=True,
         agent_executor_kwargs={"handle_parsing_errors": True},
         allow_dangerous_code=True,
-        # O prefixo agora é uma f-string que inclui a data
         prefix=f"""
-        You are a data analysis assistant specializing in pandas. Your task is to help users answer questions about the recruitment.        
+        You are a data analysis assistant. Your task is to help users answer questions about the recruitment.        
         - Before answering, ALWAYS think step-by-step about your action plan.
         - Carefully check the column names in the DataFrame before writing any code. The names are case-sensitive.
         - If you need to perform a calculation, write the pandas code for it.
@@ -105,7 +104,6 @@ def get_pandas_agent(_df_report, api_key):
         - In the 'Expected Date' column, you should interpret the date as yyyy-mm-dd.
         - When asked about today, always sum everything from the past.
         - Today is {today_date_str}
-        - 
         """
     )
     return agent
