@@ -4,9 +4,6 @@ import os
 import plotly.express as px
 import ast
 from datetime import date, timedelta
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe_agent
-from langchain.agents.agent_types import AgentType
 
 st.set_page_config(layout="wide")
 
@@ -16,7 +13,6 @@ ALLOC_FILE = 'GeminiCheck.csv'
 PROJECTS_FILE = 'Projects.csv'
 REPORT_FILE = 'Report.xlsx'
 
-google_api_key = st.secrets["GOOGLE_API_KEY"] if "GOOGLE_API_KEY" in st.secrets else None
 
 @st.cache_data
 def load_data(alloc_path, projects_path, report_path):
@@ -27,6 +23,7 @@ def load_data(alloc_path, projects_path, report_path):
     df_projects = pd.read_csv(projects_path)
     df_report = pd.read_excel(report_path)
     return df_alloc, df_projects, df_report
+
 
 @st.cache_data
 def generate_plan(_df_alloc):
@@ -61,6 +58,7 @@ def generate_plan(_df_alloc):
         return pd.DataFrame()
     df_daily_plan = pd.DataFrame(daily_plan)
     df_daily_plan['plan_date'] = pd.to_datetime(df_daily_plan['plan_date']).dt.date
+
     def extract_dynamic_data(row_series):
         try:
             keys = ast.literal_eval(row_series['cotas'])
@@ -70,6 +68,7 @@ def generate_plan(_df_alloc):
         except Exception:
             return {}
         return {}
+
     dynamic_data = df_daily_plan.apply(extract_dynamic_data, axis=1)
     dynamic_df = pd.DataFrame(dynamic_data.tolist(), index=df_daily_plan.index)
     df_daily_plan_processed = pd.concat([df_daily_plan, dynamic_df], axis=1)
@@ -79,33 +78,6 @@ def generate_plan(_df_alloc):
     df_daily_plan_processed['project_id'] = df_daily_plan_processed['project_id'].astype(str)
     return df_daily_plan_processed
 
-@st.cache_resource
-def get_pandas_agent(_df_report, api_key):
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key, temperature=0)
-    
-    today_date_str = date.today().strftime('%Y-%m-%d')
-
-    agent = create_pandas_dataframe_agent(
-        llm,
-        _df_report,
-        agent_type=AgentType.OPENAI_FUNCTIONS,
-        verbose=True,
-        agent_executor_kwargs={"handle_parsing_errors": True},
-        allow_dangerous_code=True,
-        prefix=f"""
-        You are a data analysis assistant. Your task is to help users answer questions about the recruitment.        
-        - Before answering, ALWAYS think step-by-step about your action plan.
-        - Carefully check the column names in the DataFrame before writing any code. The names are case-sensitive.
-        - If you need to perform a calculation, write the pandas code for it.
-        - When giving the final answer, briefly explain how you arrived at it.
-        - If the question is ambiguous, ask for clarification.
-        - In the 'Age' column, we have a string; the first number refers to the starting age of the range and the second to the final age of the range.
-        - In the 'Expected Date' column, you should interpret the date as yyyy-mm-dd.
-        - When asked about today, always sum everything from the past.
-        - Today is {today_date_str}
-        """
-    )
-    return agent
 
 df_alloc_original, df_projects_original, df_report = load_data(ALLOC_FILE, PROJECTS_FILE, REPORT_FILE)
 
@@ -115,38 +87,7 @@ if df_alloc_original is not None:
     if df_projects_original is not None:
         df_projects_original['project_id'] = df_projects_original['project_id'].astype(str)
 
-tab_ia, tab_charts, tab_tables = st.tabs(["AI Assistant", "Demand Charts", "Data Tables"])
-
-with tab_ia:
-    st.header("Ask about the recruitment Data")
-    if not google_api_key:
-        st.error("Chave da API do Google não encontrada. Adicione a variável GOOGLE_API_KEY aos seus secrets do Streamlit.")
-    elif df_report is not None:
-        agent = get_pandas_agent(df_report, google_api_key)
-        
-        if "messages" not in st.session_state:
-            st.session_state.messages = [{"role": "assistant", "content": "How can I help you analyze the recruitment report?"}]
-
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        if prompt := st.chat_input("What would you like to know?"):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
-
-            with st.chat_message("assistant"):
-                with st.spinner("Analyzing data..."):
-                    try:
-                        response = agent.invoke(prompt)
-                        answer = response.get("output", "Não consegui processar a resposta.")
-                    except Exception as e:
-                        answer = f"Ocorreu um erro: {e}"
-                    st.markdown(answer)
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-    else:
-        st.warning("Não foi possível carregar o arquivo de relatório para alimentar o assistente de IA.")
+tab_charts, tab_tables = st.tabs(["Demand Charts", "Data Tables"])
 
 if df_plan is not None and not df_plan.empty:
     st.sidebar.header("Filtros")
@@ -164,7 +105,7 @@ if df_plan is not None and not df_plan.empty:
             start_date, end_date = selected_range
             df_filtered_by_date = df_plan[df_plan['plan_date'].between(start_date, end_date)]
             header_title = f"Demanda de Recrutamento de: {start_date:%d/%m/%Y} a {end_date:%d/%m/%Y}"
-    
+
     df_filtered = df_filtered_by_date
     df_projects_filtered = df_projects_original.copy() if df_projects_original is not None else pd.DataFrame()
 
@@ -182,12 +123,11 @@ if df_plan is not None and not df_plan.empty:
                     selected = st.sidebar.multiselect(label, options, default=default_value)
                 else:
                     selected = st.sidebar.multiselect(label, options)
-
                 if selected:
                     df_filtered = df_filtered[df_filtered[col].isin(selected)]
                     if not df_projects_filtered.empty and col in df_projects_filtered.columns:
                         df_projects_filtered = df_projects_filtered[df_projects_filtered[col].isin(selected)]
-    
+
     with tab_charts:
         st.header(header_title)
         if df_filtered.empty:
@@ -207,15 +147,14 @@ if df_plan is not None and not df_plan.empty:
             st.markdown("---")
             custom_colors = ['#25406e', '#6ba1ff', '#a1f1ff', '#5F9EA0', '#E6E6FA']
             st.subheader("Detalhamento da Meta de Recrutamento")
-            
+
             charts_to_display = {
                 'age_group': 'Demanda por Faixa Etária', 'Gender': 'Demanda por Gênero',
                 'country': 'Demanda por País', 'SEL': 'Demanda por Classe Social (SEL)'
             }
-            
+
             col1, col2 = st.columns(2)
-            cols = [col1, col2, col1, col2] 
-            
+            cols = [col1, col2, col1, col2]
             chart_idx = 0
             for col_name, title in charts_to_display.items():
                 if col_name in df_filtered.columns:
@@ -232,7 +171,7 @@ if df_plan is not None and not df_plan.empty:
         if df_report is not None:
             st.header("Dados do Relatório de Recrutamento")
             st.dataframe(df_report)
-        
+
         st.header("Plano de Recrutamento Detalhado")
         display_cols = ['plan_date', 'daily_recruitment_goal', 'daily_allocated_goal', 'project_id', 'country', 'Recruitment', 'age_group', 'SEL', 'Gender', 'Region', 'Pessoas_Para_Recrutar', 'allocated_completes', 'DaystoDeliver']
         st.dataframe(df_filtered[[col for col in display_cols if col in df_filtered.columns]].reset_index(drop=True))
